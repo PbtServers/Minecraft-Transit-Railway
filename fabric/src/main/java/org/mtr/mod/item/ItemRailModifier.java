@@ -106,7 +106,10 @@ public class ItemRailModifier extends ItemNodeModifierBase {
 					rail = Rail.newTurnBackRail(positionStart, facingStart, positionEnd, facingEnd, Rail.Shape.QUADRATIC, 0, new ObjectArrayList<>(), transportMode);
 					break;
 				default:
-					rail = Rail.newRail(positionStart, facingStart, positionEnd, facingEnd, newRailType.railShape, 0, new ObjectArrayList<>(), isOneWay ? 0 : newRailType.speedLimit, newRailType.speedLimit, false, false, newRailType.canAccelerate, newRailType == RailType.RUNWAY, newRailType.hasSignal, transportMode);
+
+					boolean isRunway = newRailType == RailType.RUNWAY || newRailType == RailType.HIGHSPEED_RUNWAY;
+					
+					rail = Rail.newRail(positionStart, facingStart, positionEnd, facingEnd, newRailType.railShape, 0, new ObjectArrayList<>(), isOneWay ? 0 : newRailType.speedLimit, newRailType.speedLimit, false, false, newRailType.canAccelerate, isRunway, newRailType.hasSignal, transportMode);
 			}
 
 			if (rail.isValid() && isValidContinuousMovement) {
