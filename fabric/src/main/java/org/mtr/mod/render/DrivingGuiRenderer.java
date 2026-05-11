@@ -74,7 +74,7 @@ public final class DrivingGuiRenderer {
             }
             graphicsHolder.pop();
 
-            // ATS background y petals (sin cambios)
+            // ATS background y petals
             graphicsHolder.push();
             graphicsHolder.translate(0, radius - 2 - ATS_RADIUS_1, 0);
             graphicsHolder.rotateZDegrees(ATS_INTERVAL * 2.5F);
@@ -88,10 +88,10 @@ public final class DrivingGuiRenderer {
                 guiDrawing.beginDrawingRectangle();
                 if (i % 8 < 4) {
                     if (vehicle.isVehiclePastSafeStoppingDistance()) {
-                        guiDrawing.drawRectangle(-ATS_RADIUS_2, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, -ATS_RADIUS_2, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, -ATS_RADIUS_3, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_3, BLUE_COLOR);
-                        guiDrawing.drawRectangle(-ATS_RADIUS_3, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_3, -ATS_RADIUS_3, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_3, -ATS_RADIUS_4, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_4, BLUE_COLOR);
+                        guiDrawing.drawRectangle(-ATS_RADIUS_2, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, ATS_RADIUS_2, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, BLUE_COLOR);
+                        guiDrawing.drawRectangle(-ATS_RADIUS_3, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_3, ATS_RADIUS_3, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_3, BLUE_COLOR);
                     } else {
-                        guiDrawing.drawRectangle(-ATS_RADIUS_2, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, -ATS_RADIUS_2, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, -ATS_RADIUS_4, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_4, ORANGE_COLOR);
+                        guiDrawing.drawRectangle(-ATS_RADIUS_2, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, ATS_RADIUS_2, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, ORANGE_COLOR);
                     }
                 }
                 guiDrawing.finishDrawingRectangle();
