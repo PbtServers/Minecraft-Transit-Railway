@@ -70,7 +70,7 @@ public final class Items {
 		RAIL_CONNECTOR_TURN_BACK = Init.REGISTRY.registerItem(new Identifier(Init.MOD_ID, "rail_connector_turn_back"), itemSettings -> new Item(new ItemRailModifier(true, false, true, false, RailType.TURN_BACK, itemSettings)), CreativeModeTabs.CORE);
 		RAIL_CONNECTOR_CABLE_CAR = Init.REGISTRY.registerItem(new Identifier(Init.MOD_ID, "rail_connector_cable_car"), itemSettings -> new Item(new ItemRailModifier(false, true, false, true, RailType.CABLE_CAR, itemSettings)), CreativeModeTabs.CORE);
 		RAIL_CONNECTOR_RUNWAY = Init.REGISTRY.registerItem(new Identifier(Init.MOD_ID, "rail_connector_runway"), itemSettings -> new Item(new ItemRailModifier(false, false, true, true, RailType.RUNWAY, itemSettings)), CreativeModeTabs.CORE);
-		RAIL_CONNECTOR_HIGHSPEEDRUNWAY = Init.REGISTRY.registerItem(new Identifier(Init.MOD_ID, "rail_connector_highspeed_runway"), itemSettings -> new Item(new ItemRailModifier(false, false, true, true, RailType.HIGHSPEEDRUNWAY, itemSettings)), CreativeModeTabs.CORE);
+		RAIL_CONNECTOR_HIGHSPEED_RUNWAY = Init.REGISTRY.registerItem(new Identifier(Init.MOD_ID, "rail_connector_highspeed_runway"), itemSettings -> new Item(new ItemRailModifier(false, false, true, true, RailType.HIGHSPEED_RUNWAY, itemSettings)), CreativeModeTabs.CORE);
 		RAIL_REMOVER = Init.REGISTRY.registerItem(new Identifier(Init.MOD_ID, "rail_remover"), itemSettings -> new Item(new ItemRailModifier(itemSettings)), CreativeModeTabs.CORE);
 
 		// Signal connectors
