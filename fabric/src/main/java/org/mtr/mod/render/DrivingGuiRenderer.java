@@ -30,10 +30,10 @@ public final class DrivingGuiRenderer {
     private static final int SPEEDOMETER_CIRCLE_INTERVAL = 3;
     private static final double SPEEDOMETER_CIRCLE_EDGE_LENGTH = Math.tan(Math.toRadians(SPEEDOMETER_CIRCLE_INTERVAL) / 2) * TOOL_SIZE;
     
-    // Adaptación para 600 km/h
+    // Adaptacion para 600 km/h
     private static final int SPEEDOMETER_MAX_DISPLAY = 600;
     private static final int SPEEDOMETER_SPAN = 300; // Grados totales que recorre la aguja
-    private static final int SPEEDOMETER_START_ANGLE = -240; // Ángulo de inicio (parte inferior izquierda)
+    private static final int SPEEDOMETER_START_ANGLE = -240; // Angulo de inicio (parte inferior izquierda)
     private static final int SPEEDOMETER_TICK_INTERVAL = 10; // Un tick cada 10 km/h
 
     private static final int ATS_SLICES = 64;
@@ -63,7 +63,7 @@ public final class DrivingGuiRenderer {
             graphicsHolder.push();
             graphicsHolder.translate(speedometerX + radius, speedometerY + radius, 0);
 
-            // Fondo del velocímetro
+            // Fondo del velocimetro
             graphicsHolder.push();
             for (int i = 0; i < 180; i += SPEEDOMETER_CIRCLE_INTERVAL) {
                 guiDrawing.beginDrawingRectangle();
@@ -88,10 +88,10 @@ public final class DrivingGuiRenderer {
                 guiDrawing.beginDrawingRectangle();
                 if (i % 8 < 4) {
                     if (vehicle.isVehiclePastSafeStoppingDistance()) {
-                        guiDrawing.drawRectangle(-ATS_RADIUS_2, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, -ATS_RADIUS_2, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, -ATS_RADIUS_3, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_3, -ATS_RADIUS_3, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_3, ORANGE_COLOR);
-                        guiDrawing.drawRectangle(-ATS_RADIUS_3, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_3, -ATS_RADIUS_3, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_3, -ATS_RADIUS_4, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_4, -ATS_RADIUS_4, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_4, IGui.ARGB_WHITE);
+                        guiDrawing.drawRectangle(-ATS_RADIUS_2, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, -ATS_RADIUS_2, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, -ATS_RADIUS_3, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_3, BLUE_COLOR);
+                        guiDrawing.drawRectangle(-ATS_RADIUS_3, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_3, -ATS_RADIUS_3, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_3, -ATS_RADIUS_4, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_4, BLUE_COLOR);
                     } else {
-                        guiDrawing.drawRectangle(-ATS_RADIUS_2, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, -ATS_RADIUS_2, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, -ATS_RADIUS_4, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_4, -ATS_RADIUS_4, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_4, 0xFF222222);
+                        guiDrawing.drawRectangle(-ATS_RADIUS_2, -(float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, -ATS_RADIUS_2, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_2, -ATS_RADIUS_4, (float) ATS_CIRCLE_EDGE_HALF_LENGTH_4, ORANGE_COLOR);
                     }
                 }
                 guiDrawing.finishDrawingRectangle();
@@ -99,7 +99,7 @@ public final class DrivingGuiRenderer {
             }
             graphicsHolder.pop();
 
-            // Ticks del velocímetro escalados a 600
+            // Ticks del velocimetro escalados a 600
             graphicsHolder.push();
             graphicsHolder.rotateZDegrees(SPEEDOMETER_START_ANGLE);
             for (int i = 0; i <= SPEEDOMETER_MAX_DISPLAY; i += SPEEDOMETER_TICK_INTERVAL) {
@@ -115,7 +115,7 @@ public final class DrivingGuiRenderer {
             }
             graphicsHolder.pop();
 
-            // Etiquetas numéricas (Cada 100 km/h)
+            // Etiquetas numericas (Cada 100 km/h)
             graphicsHolder.push();
             graphicsHolder.rotateZDegrees(SPEEDOMETER_START_ANGLE);
             for (int i = 0; i <= SPEEDOMETER_MAX_DISPLAY; i += 100) {
@@ -131,7 +131,7 @@ public final class DrivingGuiRenderer {
             }
             graphicsHolder.pop();
 
-            // Estado de tracción/freno
+            // Estado de traccion/freno
             graphicsHolder.push();
             graphicsHolder.translate(-radius * 0.3F, -TOOL_SIZE * 0.05F - SMALL_LINE_SPACING, 0);
             final int notch = vehicleExtraData.getPowerLevel();
@@ -170,7 +170,7 @@ public final class DrivingGuiRenderer {
             drawCenteredText(graphicsHolder, "km/h", speedColor);
             graphicsHolder.pop();
 
-            // Aguja del velocímetro
+            // Aguja del velocimetro
             graphicsHolder.push();
             float needleAngle = SPEEDOMETER_START_ANGLE + (float) Math.min(speedKilometersPerHour, SPEEDOMETER_MAX_DISPLAY) * SPEEDOMETER_SPAN / SPEEDOMETER_MAX_DISPLAY;
             graphicsHolder.rotateZDegrees(needleAngle);
@@ -181,7 +181,7 @@ public final class DrivingGuiRenderer {
 
             graphicsHolder.pop();
 
-            // Indicador de parada en andén
+            // Indicador de parada en anden
             final DoubleObjectImmutablePair<DoubleDoubleImmutablePair> platformStoppingDetails = vehicle.getPlatformStoppingDetails();
             if (platformStoppingDetails != null) {
                 final double platformLength = platformStoppingDetails.right().leftDouble();
