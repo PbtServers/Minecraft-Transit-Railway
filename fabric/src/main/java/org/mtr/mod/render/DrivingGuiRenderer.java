@@ -29,7 +29,7 @@ public final class DrivingGuiRenderer {
 
 	private static final int SPEEDOMETER_CIRCLE_INTERVAL = 3;
 	private static final double SPEEDOMETER_CIRCLE_EDGE_LENGTH = Math.tan(Math.toRadians(SPEEDOMETER_CIRCLE_INTERVAL) / 2) * TOOL_SIZE;
-	private static final int SPEEDOMETER_SPAN = 300;
+	private static final int SPEEDOMETER_SPAN = 600;
 	private static final int SPEEDOMETER_START_ANGLE = -60;
 	private static final int SPEEDOMETER_TICK_INTERVAL = 5;
 
