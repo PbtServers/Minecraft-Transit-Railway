@@ -22,6 +22,7 @@ dependencies {
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${buildTools.getFabricApiVersion()}"
 	modApi("com.terraformersmc:modmenu:${buildTools.getModMenuVersion()}") { exclude group: "net.fabricmc", module: "fabric-loader" }
 	shadowImplementation "org.mtr:Minecraft-Mappings-fabric-${minecraftVersion}:0.0.1-dev"
+	implementation "org.jspecify:jspecify:1.0.0"
 	testImplementation "org.junit.jupiter:junit-jupiter-api:5.+"
 	testImplementation "org.junit.platform:junit-platform-launcher:1.+"
 	testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.+"

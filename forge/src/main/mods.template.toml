@@ -5,9 +5,9 @@ license = "MIT"
 [[mods]]
 modId = "mtr"
 version = "@version@"
-displayName = "Minecraft Transit Railway"
-authors = "Jonathan Ho"
-description = "A Minecraft mod that adds automated train systems into the game."
+displayName = "Minecraft Transit Railway (PbtinaDev's Edition)"
+authors = ["Jonathan Ho", "PbtinaDev (Fork)"]
+description = "Un mod de Minecraft con sistemas de trenes automatizados."
 logoFile = "icon.png"
 
 [[dependencies.mtr]]

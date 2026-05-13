@@ -2,10 +2,11 @@
 	"schemaVersion": 1,
 	"id": "mtr",
 	"version": "@version@",
-	"name": "Minecraft Transit Railway",
-	"description": "A Minecraft mod that adds automated train systems into the game.",
+	"name": "Minecraft Transit Railway (PbtinaDev's Edition)",
+	"description": "Un mod de Minecraft que añade sistemas de trenes automatizados al juego.",
 	"authors": [
-		"Jonathan Ho"
+		"Jonathan Ho",
+		"PbtinaDev (Fork)"
 	],
 	"contact": {
 		"homepage": "https://www.curseforge.com/minecraft/mc-mods/minecraft-transit-railway",

@@ -3,6 +3,12 @@ plugins {
 	id "com.github.johnrengelman.shadow" version "+" apply false
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
 group "org.mtr.mod"
 version rootProject.properties.version
 

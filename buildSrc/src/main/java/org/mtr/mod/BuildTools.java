@@ -305,7 +305,7 @@ public class BuildTools {
 	public void copyBuildFile(boolean excludeAssets) throws IOException {
 		final Path directory = path.getParent().resolve("build/release");
 		Files.createDirectories(directory);
-		Files.copy(path.resolve(String.format("build/libs/%s-%s%s.jar", loader, version, loader.equals("fabric") ? "" : "-all")), directory.resolve(String.format("MTR-%s-%s+%s%s.jar", loader, version, minecraftVersion, excludeAssets ? "-server" : "")), StandardCopyOption.REPLACE_EXISTING);
+		Files.copy(path.resolve(String.format("build/libs/%s-%s%s.jar", loader, version, loader.equals("fabric") ? "" : "-all")), directory.resolve(String.format("MTR-Fix-%s-%s+%s%s-PbtinaDev.jar", loader, version, minecraftVersion, excludeAssets ? "-server" : "")), StandardCopyOption.REPLACE_EXISTING);
 	}
 
 	public void getPatreonList(String key) throws IOException {

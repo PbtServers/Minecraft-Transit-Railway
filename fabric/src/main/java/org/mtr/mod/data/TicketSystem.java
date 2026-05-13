@@ -28,7 +28,7 @@ public class TicketSystem {
 	private static final String ENTRY_ZONE_3_TITLE = "Entry Zone 3";
 	private static final int BASE_FARE = 2;
 	private static final int ZONE_FARE = 1;
-	private static final int EVASION_FINE = 500;
+	private static final int EVASION_FINE = 0;
 
 	public static void passThrough(World world, BlockPos blockPos, PlayerEntity player, boolean isEntrance, boolean isExit, SoundEvent entrySound, SoundEvent entrySoundConcessionary, SoundEvent exitSound, SoundEvent exitSoundConcessionary, @Nullable SoundEvent failSound, boolean remindIfNoRecord, Consumer<EnumTicketBarrierOpen> callback) {
 		Init.sendMessageC2S(OperationProcessor.NEARBY_STATIONS, world.getServer(), world, new NearbyAreasRequest<>(Init.blockPosToPosition(blockPos), 0), nearbyAreasResponse -> {
