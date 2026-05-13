@@ -1,0 +1,95 @@
+import org.mtr.core.Generator
+import org.mtr.core.WebserverSetup
+
+plugins {
+	id "java"
+	id "maven-publish"
+	id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group "org.mtr.core"
+version rootProject.properties.version
+
+repositories {
+	mavenCentral()
+	maven { url = "https://repo.mikeprimm.com/" }
+	flatDir { dirs "libs" }
+}
+
+dependencies {
+	implementation "org.mtr:Shadow-Libraries-net:0.0.1"
+	implementation "org.mtr:Shadow-Libraries-util:0.0.1"
+	implementation "com.google.code.gson:gson:2.10.1"
+	implementation "it.unimi.dsi:fastutil:8.5.12"
+	implementation "commons-io:commons-io:2.11.0"
+	implementation "org.apache.logging.log4j:log4j-core:2.24.+"
+	compileOnly "com.google.code.findbugs:jsr305:+"
+	compileOnly "xyz.jpenilla:squaremap-api:+"
+	compileOnly "net.kyori:adventure-api:4.17.0"
+	compileOnly "us.dynmap:DynmapCoreAPI:3.7-beta-6"
+	testImplementation "org.junit.jupiter:junit-jupiter-api:+"
+	testImplementation "org.junit.platform:junit-platform-launcher:+"
+	testImplementation "org.apache.httpcomponents:httpclient:+"
+	testCompileOnly "com.google.code.findbugs:jsr305:+"
+	testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:+"
+}
+
+java {
+	toolchain {
+		languageVersion.set(JavaLanguageVersion.of(8))
+	}
+	withSourcesJar()
+	withJavadocJar()
+}
+
+publishing {
+	publications {
+		maven(MavenPublication) {
+			from components.java
+		}
+	}
+}
+
+shadowJar {
+    // Esto mueve GSON al paquete que el código de MTR espera
+    relocate 'com.google.gson', 'org.mtr.libraries.com.google.gson'
+    
+    // Esto mueve Fastutil
+    relocate 'it.unimi.dsi.fastutil', 'org.mtr.libraries.it.unimi.dsi.fastutil'
+    
+    // Esto mueve Apache Commons IO
+    relocate 'org.apache.commons.io', 'org.mtr.libraries.org.apache.commons.io'
+
+    // Opcional: configurar el nombre del archivo de salida
+    archiveClassifier.set('all') 
+}
+
+jar {
+	manifest {
+		attributes("Main-Class": "org.mtr.core.Main")
+	}
+}
+
+test {
+	useJUnitPlatform()
+	testLogging { showStandardStreams = true }
+}
+
+tasks.register("generateTypeScriptSchemaClasses") {
+	Generator.generateTypeScript(project, "schema/map", "buildSrc/src/main/resources/website/src/app/entity/generated")
+}
+
+tasks.register("generateJavaSchemaClasses") {
+	Generator.generateJava(project, "schema/data", "core/generated/data", true, "core.data", "core.simulation")
+	Generator.generateJava(project, "schema/legacy", "legacy/generated/data", false, "core.data", "legacy.data")
+	Generator.generateJava(project, "schema/integration", "core/generated/integration", false, "core.data", "core.integration")
+	Generator.generateJava(project, "schema/map", "core/generated/map", false, "core.map")
+	Generator.generateJava(project, "schema/oba", "core/generated/oba", false, "core.oba")
+	Generator.generateJava(project, "schema/operation", "core/generated/operation", false, "core.data", "core.operation")
+	WebserverSetup.setup(project.rootDir, "", "core")
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+	preserveFileTimestamps = false
+	reproducibleFileOrder = true
+}

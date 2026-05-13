@@ -1,0 +1,5 @@
+./gradlew.bat generateJavaSchemaClasses -Dorg.gradle.java.home="G:\Programas\zulu-8"
+
+./gradlew.bat -x test clean build -Dorg.gradle.java.home="G:\Programas\zulu-8"
+
+./gradlew.bat shadowJar

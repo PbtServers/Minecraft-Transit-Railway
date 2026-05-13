@@ -1,0 +1,86 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"javaExtends": [
+		"TwoPositionsBase"
+	],
+	"properties": {
+		"position1": {
+			"$ref": "position.json"
+		},
+		"angle1": {
+			"$ref": "Angle"
+		},
+		"position2": {
+			"$ref": "position.json"
+		},
+		"angle2": {
+			"$ref": "Angle"
+		},
+		"shape": {
+			"$ref": "Rail.Shape"
+		},
+		"verticalRadius": {
+			"type": "number"
+		},
+		"styles": {
+			"type": "array",
+			"items": {
+				"type": "string"
+			}
+		},
+		"speedLimit1": {
+			"type": "integer"
+		},
+		"speedLimit2": {
+			"type": "integer"
+		},
+		"isPlatform": {
+			"type": "boolean"
+		},
+		"isSiding": {
+			"type": "boolean"
+		},
+		"canAccelerate": {
+			"type": "boolean"
+		},
+		"canTurnBack": {
+			"type": "boolean"
+		},
+		"canConnectRemotely": {
+			"type": "boolean"
+		},
+		"canHaveSignal": {
+			"type": "boolean"
+		},
+		"signalColors": {
+			"type": "array",
+			"items": {
+				"type": "integer"
+			}
+		},
+		"transportMode": {
+			"$ref": "TransportMode"
+		},
+		"stylesMigratedLegacy": {
+			"type": "boolean"
+		}
+	},
+	"required": [
+		"position1",
+		"angle1",
+		"position2",
+		"angle2",
+		"shape",
+		"verticalRadius",
+		"speedLimit1",
+		"speedLimit2",
+		"isPlatform",
+		"isSiding",
+		"canAccelerate",
+		"canTurnBack",
+		"canConnectRemotely",
+		"canHaveSignal",
+		"transportMode"
+	]
+}

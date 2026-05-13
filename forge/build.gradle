@@ -27,7 +27,6 @@ dependencies {
 	minecraft "net.minecraftforge:forge:${minecraftVersion}-${buildTools.getForgeVersion()}"
 	annotationProcessor "org.spongepowered:mixin:+:processor"
 	shadowImplementation "org.mtr:Minecraft-Mappings-forge-${minecraftVersion}:0.0.1-dev"
-	implementation "org.jspecify:jspecify:1.0.0"
 
 	if (buildTools.hasJadeSupport()) {
 		compileOnly fg.deobf("maven.modrinth:jade:${buildTools.getJadeVersion()}")

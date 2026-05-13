@@ -1,0 +1,33 @@
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation "com.google.code.gson:gson:+"
+	implementation "it.unimi.dsi:fastutil:+"
+	implementation "commons-io:commons-io:+"
+}
+
+java {
+	toolchain {
+		languageVersion.set(JavaLanguageVersion.of(8))
+	}
+}
+
+jar {
+	archiveBaseName = "Transport-Simulation-Core-Build-Tools"
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+	preserveFileTimestamps = false
+	reproducibleFileOrder = true
+	excludes = [
+			"website/.*",
+			"website/dist",
+			"website/node_modules",
+			"website/src/app",
+			"website/src/assets",
+			"website/src/index.html",
+			"website/src/main.ts",
+	]
+}
