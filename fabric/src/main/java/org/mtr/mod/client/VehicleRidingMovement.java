@@ -54,6 +54,7 @@ public class VehicleRidingMovement {
 	private static int seatToggleRequestTicks;
 	private static boolean seatUseRequested;
 	private static boolean isSeated;
+	private static int seatCycleIndex;
 	private static Vector3d seatedPosition;
 
 	public static final int SEND_UPDATE_FREQUENCY = 1000;
@@ -62,6 +63,7 @@ public class VehicleRidingMovement {
 	private static final int SHIFT_ACTIVATE_TICKS = 30;
 	private static final int DISMOUNT_PROGRESS_BAR_LENGTH = 30;
 	private static final int SEAT_TOGGLE_REQUEST_TIMEOUT = 10;
+	private static final double SEAT_CYCLE_MAX_DISTANCE_SQUARED = 4;
 
 	public static void tick() {
 		final MinecraftClient minecraftClient = MinecraftClient.getInstance();
@@ -386,15 +388,24 @@ public class VehicleRidingMovement {
 			return;
 		}
 
-		final Box seat = seats.stream().min(Comparator.comparingDouble(seatBox -> {
-			final double centerX = (seatBox.getMinXMapped() + seatBox.getMaxXMapped()) / 2;
-			final double centerY = (seatBox.getMinYMapped() + seatBox.getMaxYMapped()) / 2;
-			final double centerZ = (seatBox.getMinZMapped() + seatBox.getMaxZMapped()) / 2;
-			final double offsetX = centerX - playerPosition.getXMapped();
-			final double offsetY = centerY - playerPosition.getYMapped();
-			final double offsetZ = centerZ - playerPosition.getZMapped();
-			return offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ;
-		})).orElse(null);
+		final ObjectArrayList<Box> nearbySeats = new ObjectArrayList<>();
+
+		seats.stream()
+				.filter(seatBox -> getSeatDistanceSquared(seatBox, playerPosition) <= SEAT_CYCLE_MAX_DISTANCE_SQUARED)
+				.sorted(Comparator.comparingDouble(seatBox -> getSeatDistanceSquared(seatBox, playerPosition)))
+				.forEach(nearbySeats::add);
+
+		if (nearbySeats.isEmpty()) {
+			seats.stream()
+					.sorted(Comparator.comparingDouble(seatBox -> getSeatDistanceSquared(seatBox, playerPosition)))
+					.forEach(nearbySeats::add);
+		}
+
+		final Box seat = nearbySeats.isEmpty() ? null : nearbySeats.get(seatCycleIndex % nearbySeats.size());
+
+		if (seat != null) {
+			seatCycleIndex = (seatCycleIndex + 1) % nearbySeats.size();
+		}
 
 		if (seat == null) {
 			seatToggleRequested = false;
@@ -509,6 +520,16 @@ public class VehicleRidingMovement {
 			runnable.run();
 			InitClient.scheduleMovePlayer(runnable);
 		}
+	}
+
+	private static double getSeatDistanceSquared(Box seatBox, Vector3d playerPosition) {
+		final double centerX = (seatBox.getMinXMapped() + seatBox.getMaxXMapped()) / 2;
+		final double centerY = (seatBox.getMinYMapped() + seatBox.getMaxYMapped()) / 2;
+		final double centerZ = (seatBox.getMinZMapped() + seatBox.getMaxZMapped()) / 2;
+		final double offsetX = centerX - playerPosition.getXMapped();
+		final double offsetY = centerY - playerPosition.getYMapped();
+		final double offsetZ = centerZ - playerPosition.getZMapped();
+		return offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ;
 	}
 
 	private static void resetSeatingState() {
