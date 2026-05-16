@@ -18,6 +18,7 @@ import org.mtr.mod.data.ArrivalsCacheClient;
 import org.mtr.mod.data.IGui;
 import org.mtr.mod.entity.EntityRendering;
 import org.mtr.mod.generated.lang.TranslationProvider;
+import org.mtr.mod.Init;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -70,7 +71,7 @@ public class MainRenderer extends EntityRenderer<EntityRendering> implements IGu
 	@Nonnull
 	@Override
 	public Identifier getTexture2(EntityRendering entityRendering) {
-		return new Identifier("");
+		return new Identifier(Init.MOD_ID, "textures/block/white.png");
 	}
 
 	public static void render(GraphicsHolder graphicsHolder, Vector3d offset) {
@@ -173,7 +174,7 @@ public class MainRenderer extends EntityRenderer<EntityRendering> implements IGu
 	}
 
 	public static void scheduleRender(QueuedRenderLayer queuedRenderLayer, BiConsumer<GraphicsHolder, Vector3d> callback) {
-		scheduleRender(new Identifier(""), false, queuedRenderLayer, callback);
+		scheduleRender(new Identifier(Init.MOD_ID, "textures/block/white.png"), false, queuedRenderLayer, callback);
 	}
 
 	public static void cancelRender(Identifier identifier) {

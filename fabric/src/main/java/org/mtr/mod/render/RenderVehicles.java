@@ -42,8 +42,9 @@ public class RenderVehicles implements IGui {
 		}
 
 		final ObjectArrayList<Function<OcclusionCullingInstance, Runnable>> cullingTasks = new ObjectArrayList<>();
-		final Vector3d cameraPosition = minecraftClient.getGameRendererMapped().getCamera().getPos();
-		final Vec3d camera = new Vec3d(cameraPosition.getXMapped(), cameraPosition.getYMapped(), cameraPosition.getZMapped());
+		final Camera camera = minecraftClient.getGameRendererMapped().getCamera();
+		final Vector3d cameraPosition = camera.getPos();
+		final Vec3d cameraVec = new Vec3d(cameraPosition.getXMapped(), cameraPosition.getYMapped(), cameraPosition.getZMapped());
 
 		// When riding a moving vehicle, the client movement is always out of sync with the vehicle rendering. This produces annoying shaking effects.
 		// Offsets are used to render the vehicle with respect to the player position rather than the absolute world position, eliminating shaking.
@@ -100,7 +101,7 @@ public class RenderVehicles implements IGui {
 							vehicleCarDetails.right().right().position.x + longestDimension,
 							vehicleCarDetails.right().right().position.y + 8,
 							vehicleCarDetails.right().right().position.z + longestDimension
-					), camera);
+					), cameraVec);
 					return () -> vehicle.persistentVehicleData.rayTracing[carNumber] = shouldRender;
 				});
 
@@ -127,13 +128,23 @@ public class RenderVehicles implements IGui {
 
 						// Player position relative to the car
 						final Vector3d playerPosition = absoluteVehicleCarPositionAndRotation.transformBackwards(clientPlayerEntity.getPos(), Vector3d::rotateX, Vector3d::rotateY, Vector3d::add);
+						// Vehicle resource cache
+						final VehicleResourceCache vehicleResourceCache = vehicleResource.getCachedVehicleResource(carNumber, vehicle.vehicleExtraData.immutableVehicleCars.size(), false);
+						if (vehicleResourceCache != null && VehicleRidingMovement.hasSeatToggleRequest() && ridingCarNumber == carNumber) {
+							VehicleRidingMovement.toggleSeat(vehicle.getId(), carNumber, vehicleResourceCache.seats, playerPosition, clientPlayerEntity);
+						}
+						if (vehicleResourceCache != null && VehicleRidingMovement.hasSeatUseRequest() && ridingCarNumber == carNumber) {
+							final Box clickedSeat = getClickedSeat(absoluteVehicleCarPositionAndRotation, vehicleResourceCache.seats, cameraPosition, camera.getYaw(), camera.getPitch());
+							if (clickedSeat != null) {
+								VehicleRidingMovement.applySeatToggle(ObjectArrayList.of(clickedSeat), playerPosition, clientPlayerEntity);
+							}
+							VehicleRidingMovement.consumeSeatUseRequest();
+						}
 						// A temporary list to store all floors and doorways for player movement
 						final ObjectArrayList<ObjectBooleanImmutablePair<Box>> floorsAndDoorways = new ObjectArrayList<>();
 						// Extra floors to be used to define where the gangways are
 						final GangwayMovementPositions gangwayMovementPositions1 = new GangwayMovementPositions(absoluteVehicleCarPositionAndRotation, false);
 						final GangwayMovementPositions gangwayMovementPositions2 = new GangwayMovementPositions(absoluteVehicleCarPositionAndRotation, true);
-						// Vehicle resource cache
-						final VehicleResourceCache vehicleResourceCache = vehicleResource.getCachedVehicleResource(carNumber, vehicle.vehicleExtraData.immutableVehicleCars.size(), false);
 						// Find open doorways (close to platform blocks, unlocked platform screen doors, or unlocked automatic platform gates)
 						final ObjectArrayList<ObjectDoubleImmutablePair<Box>> openDoorways;
 						if (vehicleResourceCache != null && fromResourcePackCreator) {
@@ -487,11 +498,72 @@ public class RenderVehicles implements IGui {
 		// Render player
 		MainRenderer.scheduleRender(QueuedRenderLayer.INTERIOR, (graphicsHolder, offset) -> {
 			storedMatrixTransformations.transform(graphicsHolder, offset);
+			final ClientPlayerEntity clientPlayerEntity = MinecraftClient.getInstance().getPlayerMapped();
+			if (VehicleRidingMovement.isSeated() && clientPlayerEntity != null && entity.getUuid().equals(clientPlayerEntity.getUuid())) {
+				entity.setPose(EntityPose.CROUCHING);
+			}
 			graphicsHolder.rotateXDegrees(180);
 			graphicsHolder.rotateYDegrees(180);
 			graphicsHolder.renderEntity(entity, 0, 1000, 0, 0, 0, GraphicsHolder.getDefaultLight());
 			graphicsHolder.pop();
 		});
+	}
+
+	@Nullable
+	private static Box getClickedSeat(PositionAndRotation positionAndRotation, Iterable<Box> seats, Vector3d cameraPosition, float cameraYaw, float cameraPitch) {
+		final double yaw = Math.toRadians(cameraYaw);
+		final double pitch = Math.toRadians(cameraPitch);
+		final Vector3d rayStart = positionAndRotation.transformBackwards(cameraPosition, Vector3d::rotateX, Vector3d::rotateY, Vector3d::add);
+		final Vector3d rayEnd = positionAndRotation.transformBackwards(cameraPosition.add(
+				-Math.sin(yaw) * Math.cos(pitch) * 5,
+				-Math.sin(pitch) * 5,
+				Math.cos(yaw) * Math.cos(pitch) * 5
+		), Vector3d::rotateX, Vector3d::rotateY, Vector3d::add);
+
+		Box closestSeat = null;
+		double closestDistance = Double.MAX_VALUE;
+		for (final Box seat : seats) {
+			final double distance = getRayBoxIntersection(rayStart, rayEnd, seat, 0.35);
+			if (distance >= 0 && distance < closestDistance) {
+				closestSeat = seat;
+				closestDistance = distance;
+			}
+		}
+		return closestSeat;
+	}
+
+	private static double getRayBoxIntersection(Vector3d rayStart, Vector3d rayEnd, Box box, double padding) {
+		double tMin = 0;
+		double tMax = 1;
+		final double[] rayStartValues = {rayStart.getXMapped(), rayStart.getYMapped(), rayStart.getZMapped()};
+		final double[] rayEndValues = {rayEnd.getXMapped(), rayEnd.getYMapped(), rayEnd.getZMapped()};
+		final double[] minValues = {box.getMinXMapped() - padding, box.getMinYMapped() - padding, box.getMinZMapped() - padding};
+		final double[] maxValues = {box.getMaxXMapped() + padding, box.getMaxYMapped() + padding, box.getMaxZMapped() + padding};
+
+		for (int i = 0; i < 3; i++) {
+			final double direction = rayEndValues[i] - rayStartValues[i];
+			if (Math.abs(direction) < 1.0E-7) {
+				if (rayStartValues[i] < minValues[i] || rayStartValues[i] > maxValues[i]) {
+					return -1;
+				}
+			} else {
+				final double inverseDirection = 1 / direction;
+				double t1 = (minValues[i] - rayStartValues[i]) * inverseDirection;
+				double t2 = (maxValues[i] - rayStartValues[i]) * inverseDirection;
+				if (t1 > t2) {
+					final double temp = t1;
+					t1 = t2;
+					t2 = temp;
+				}
+				tMin = Math.max(tMin, t1);
+				tMax = Math.min(tMax, t2);
+				if (tMin > tMax) {
+					return -1;
+				}
+			}
+		}
+
+		return tMin;
 	}
 
 	private static void renderConnection(

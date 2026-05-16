@@ -118,6 +118,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 			PositionDefinitions positionDefinitionsObject,
 			ObjectArraySet<Box> floors,
 			ObjectArraySet<Box> doorways,
+			ObjectArraySet<Box> seats,
 			Object2ObjectOpenHashMap<PartCondition, Object2ObjectOpenHashMap<RenderStage, OptimizedModelWrapper.MaterialGroupWrapper>> materialGroupsForPartConditionAndRenderStage,
 			Object2ObjectOpenHashMap<PartCondition, Object2ObjectOpenHashMap<RenderStage, OptimizedModelWrapper.MaterialGroupWrapper>> materialGroupsForPartConditionAndRenderStageDoorsClosed
 	) {
@@ -150,12 +151,17 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 		positionDefinitions.forEach(positionDefinitionName -> positionDefinitionsObject.getPositionDefinition(positionDefinitionName, (positions, positionsFlipped) -> {
 			switch (type) {
 				case NORMAL:
+				case SEAT:
 					iteratePositions(positions, positionsFlipped, (x, y, z, flipped) -> {
 						if (!isDoor()) {
 							addCube(texture, modelParts, materialGroupsForPartConditionAndRenderStage, x, y, z, flipped);
 						}
 						addCube(texture, modelParts, materialGroupsForPartConditionAndRenderStageDoorsClosed, x, y, z, flipped);
-						partDetailsList.add(new PartDetails(modelParts, optimizedModelDoor, addBox(mutableBox.get(), x, y, z, flipped), x, y, z, flipped));
+						final Box box = addBox(mutableBox.get(), x, y, z, flipped);
+						partDetailsList.add(new PartDetails(modelParts, optimizedModelDoor, box, x, y, z, flipped));
+						if (type == PartType.SEAT) {
+							seats.add(box);
+						}
 					});
 					break;
 				case DISPLAY:
@@ -174,6 +180,9 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 	public void writeCache(
 			Map<String, OptimizedModel.ObjModel> nameToObjModels,
 			PositionDefinitions positionDefinitionsObject,
+			ObjectArraySet<Box> floors,
+			ObjectArraySet<Box> doorways,
+			ObjectArraySet<Box> seats,
 			Object2ObjectOpenHashMap<PartCondition, Object2ObjectOpenHashMap<RenderStage, ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper>>> objModelsForPartConditionAndRenderStage,
 			Object2ObjectOpenHashMap<PartCondition, Object2ObjectOpenHashMap<RenderStage, ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper>>> objModelsForPartConditionAndRenderStageDoorsClosed,
 			double modelYOffset
@@ -193,13 +202,17 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 		optimizedModelDoor = () -> isDoor() ? OptimizedModelWrapper.fromObjModels(objModels) : null;
 
 		positionDefinitions.forEach(positionDefinitionName -> positionDefinitionsObject.getPositionDefinition(positionDefinitionName, (positions, positionsFlipped) -> {
-			if (type == PartType.NORMAL) {
+			if (type == PartType.NORMAL || type == PartType.SEAT) {
 				iteratePositions(positions, positionsFlipped, (x, y, z, flipped) -> {
 					if (!isDoor()) {
 						addObjModelPosition(objModels, objModelsForPartConditionAndRenderStage, x, y, z, flipped, modelYOffset);
 					}
 					addObjModelPosition(objModels, objModelsForPartConditionAndRenderStageDoorsClosed, x, y, z, flipped, modelYOffset);
-					partDetailsList.add(new PartDetails(new ObjectArrayList<>(), optimizedModelDoor.get(), addBox(mutableBox.get(), x, y, z, flipped), x, y, z, flipped));
+					final Box box = addBox(mutableBox.get(), x, y, z, flipped);
+					partDetailsList.add(new PartDetails(new ObjectArrayList<>(), optimizedModelDoor.get(), box, x, y, z, flipped));
+					if (type == PartType.SEAT) {
+						seats.add(box);
+					}
 				});
 			}
 		}));
@@ -209,6 +222,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 		if (vehicle == null || VehicleResource.matchesCondition(vehicle, condition, openDoorways.isEmpty())) {
 			switch (type) {
 				case NORMAL:
+				case SEAT:
 					final ObjectIntImmutablePair<QueuedRenderLayer> renderProperties = getRenderProperties(renderStage, light, vehicle);
 					if (OptimizedRenderer.hasOptimizedRendering()) {
 						MainRenderer.scheduleRender(QueuedRenderLayer.TEXT, (graphicsHolder, offset) -> renderNormal(storedMatrixTransformations, vehicle, renderProperties, openDoorways, light, graphicsHolder, offset));

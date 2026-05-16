@@ -528,6 +528,7 @@
 	"key.mtr.train_accelerate": "Acelerar Vehículo",
 	"key.mtr.train_brake": "Frenar Vehículo",
 	"key.mtr.train_toggle_doors": "Alternar Puertas",
+	"key.mtr.train_toggle_sitting": "Alternar Asiento",
 	"lift.mtr.default_transparent": "Ascensor Predeterminado (Transparente)",
 	"object.mtr.teapot": "Tetera de Utah",
 	"options.mtr.anonymous": "Anónimo",

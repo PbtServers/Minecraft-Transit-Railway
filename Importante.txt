@@ -1,3 +1,11 @@
 ./gradlew.bat setupFiles -PminecraftVersion="1.20.1" -Dorg.gradle.java.home="G:\Programas\zulu-21"
 
 ./gradlew.bat clean build -PminecraftVersion="1.20.1" -Dorg.gradle.java.home="G:\Programas\zulu-21"
+
+./gradlew.bat --stop
+
+./gradlew.bat forge:setupFiles
+
+./gradlew.bat :forge:compileJava
+
+./gradlew.bat forge:runClient

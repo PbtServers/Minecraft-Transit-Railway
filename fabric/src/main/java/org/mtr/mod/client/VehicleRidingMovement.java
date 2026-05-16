@@ -5,6 +5,7 @@ import org.mtr.core.tool.Utilities;
 import org.mtr.libraries.it.unimi.dsi.fastutil.ints.IntObjectImmutablePair;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectBooleanImmutablePair;
+import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectCollection;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectObjectImmutablePair;
 import org.mtr.mapping.holder.*;
 import org.mtr.mapping.mapper.EntityHelper;
@@ -40,7 +41,6 @@ public class VehicleRidingMovement {
 	private static Double ridingYawDifference;
 	private static double previousVehicleYaw;
 
-	// Cooldown for sending player position to simulator
 	private static long sendPositionUpdateTime;
 
 	private static boolean isHoldingDriverKey = false;
@@ -49,6 +49,11 @@ public class VehicleRidingMovement {
 	private static int pressingDoorsTicks = 0;
 	private static int pressingAtoTicks = 0;
 	private static int doorOverrideTicks;
+	private static boolean seatToggleRequested;
+	private static boolean seatToggleKeyPressedLastTick;
+	private static boolean seatUseRequested;
+	private static boolean isSeated;
+	private static Vector3d seatedPosition;
 
 	public static final int SEND_UPDATE_FREQUENCY = 1000;
 	private static final float VEHICLE_WALKING_SPEED_MULTIPLIER = 0.005F;
@@ -59,15 +64,27 @@ public class VehicleRidingMovement {
 	public static void tick() {
 		final MinecraftClient minecraftClient = MinecraftClient.getInstance();
 		final ItemDriverKey driverKey = getValidHoldingKey(ridingDepotId);
+		final boolean seatToggleKeyPressed = KeyBindings.TRAIN_TOGGLE_SITTING.isPressed();
+		final boolean sneakKeyPressed = minecraftClient.getOptionsMapped().getKeySneakMapped().isPressed();
 
-		if (ridingVehicleCooldown < RIDING_COOLDOWN && shiftHoldingTicks < SHIFT_ACTIVATE_TICKS) {
-			ridingVehicleCooldown++;
-		} else {
-			// If no vehicles are updating the player's position, dismount the player
-			sendUpdate(true);
-			ridingDepotId = 0;
-			ridingSidingId = 0;
-			ridingVehicleId = 0;
+		if (seatToggleKeyPressed && !seatToggleKeyPressedLastTick && ridingVehicleId != 0) {
+			seatToggleRequested = true;
+		}
+		seatToggleKeyPressedLastTick = seatToggleKeyPressed;
+
+		// Click derecho desactivado temporalmente. Antes sentaba al jugador al hacer click en cualquier parte del vehículo.
+		seatUseRequested = false;
+
+		if (ridingVehicleId != 0) {
+			if (ridingVehicleCooldown < RIDING_COOLDOWN && shiftHoldingTicks < SHIFT_ACTIVATE_TICKS) {
+				ridingVehicleCooldown++;
+			} else {
+				sendUpdate(true);
+				ridingDepotId = 0;
+				ridingSidingId = 0;
+				ridingVehicleId = 0;
+				resetSeatingState();
+			}
 		}
 
 		if (ridingPositionCache != null) {
@@ -91,7 +108,12 @@ public class VehicleRidingMovement {
 		}
 
 		if (ridingVehicleId == 0) {
-			shiftHoldingTicks = 0;
+			resetSeatingState();
+
+			final ClientPlayerEntity clientPlayerEntity = minecraftClient.getPlayerMapped();
+			if (clientPlayerEntity != null) {
+				clientPlayerEntity.setPose(EntityPose.STANDING);
+			}
 		} else {
 			if (KeyBindings.LIFT_MENU.isPressed()) {
 				final Screen currentScreen = minecraftClient.getCurrentScreenMapped();
@@ -101,17 +123,18 @@ public class VehicleRidingMovement {
 			}
 
 			final ClientPlayerEntity clientPlayerEntity = minecraftClient.getPlayerMapped();
-			if (clientPlayerEntity != null && clientPlayerEntity.isSneaking()) {
+			if (clientPlayerEntity != null && sneakKeyPressed) {
 				shiftHoldingTicks += minecraftClient.getLastFrameDuration();
 			} else {
 				shiftHoldingTicks = 0;
 			}
+
+			if (clientPlayerEntity != null) {
+				clientPlayerEntity.setPose(isSeated ? EntityPose.CROUCHING : EntityPose.STANDING);
+			}
 		}
 	}
 
-	/**
-	 * Iterate through all open floors and doorways and see if the player is intersecting any of them. If so, start riding the vehicle.
-	 */
 	public static void startRiding(ObjectArrayList<Box> openFloorsAndDoorways, long depotId, long sidingId, long vehicleId, int carNumber, double x, double y, double z, double yaw) {
 		if (ridingVehicleId == 0 || isRiding(vehicleId)) {
 			for (final Box floorOrDoorway : openFloorsAndDoorways) {
@@ -152,13 +175,30 @@ public class VehicleRidingMovement {
 		if (isRiding(vehicleId) && ridingVehicleCarNumber == carNumber) {
 			ridingVehicleCooldown = 0;
 			final double entityYawOld = EntityHelper.getYaw(new Entity(clientPlayerEntity.data));
+
+			if (isSeated && seatedPosition != null) {
+				ridingVehicleX = seatedPosition.getXMapped();
+				ridingVehicleY = seatedPosition.getYMapped();
+				ridingVehicleZ = seatedPosition.getZMapped();
+				ridingPositionCache = seatedPosition;
+
+				final Vector3d newPlayerPosition = positionAndRotation.transformForwards(seatedPosition, Vector3d::rotateX, Vector3d::rotateY, Vector3d::add);
+				movePlayer(newPlayerPosition.getXMapped(), newPlayerPosition.getYMapped(), newPlayerPosition.getZMapped());
+
+				EntityHelper.setYaw(new Entity(clientPlayerEntity.data), (float) (Math.toDegrees(previousVehicleYaw - positionAndRotation.yaw) + entityYawOld));
+				ridingYawDifference = Math.abs(positionAndRotation.yaw - previousVehicleYaw) > 0.001 ? previousVehicleYaw + Math.toRadians(entityYawOld) : null;
+				previousVehicleYaw = positionAndRotation.yaw;
+				return;
+			}
+
 			final float speedMultiplier = millisElapsed * VEHICLE_WALKING_SPEED_MULTIPLIER * (clientPlayerEntity.isSprinting() ? 2 : 1);
-			// Calculate the relative motion inside vehicle (+Z towards back of vehicle, +/-X towards the left and right of the vehicle)
+
 			final Vector3d movement = positionAndRotation.transformBackwards(new Vector3d(
 					Math.abs(clientPlayerEntity.getSidewaysSpeedMapped()) > 0.5 ? Math.copySign(speedMultiplier, clientPlayerEntity.getSidewaysSpeedMapped()) : 0,
 					0,
 					Math.abs(clientPlayerEntity.getForwardSpeedMapped()) > 0.5 ? Math.copySign(speedMultiplier, clientPlayerEntity.getForwardSpeedMapped()) : 0
 			), (vector, pitch) -> vector, (vector, yaw) -> vector.rotateY((float) (yaw - Math.toRadians(entityYawOld))), (vector, x, y, z) -> vector);
+
 			final double movementX = movement.getXMapped();
 			final double movementZ = movement.getZMapped();
 
@@ -167,35 +207,33 @@ public class VehicleRidingMovement {
 			}
 
 			if (isOnGangway) {
-				// If the player is currently standing on a gangway, ridingVehicleX and Z will indicate percentages along the gangway (rather than a relative coordinate inside the vehicle car)
 				if (thisCarGangwayMovementPositions1 == null || previousCarGangwayMovementPositions == null) {
-					// Dismount player
 					sendUpdate(true);
 					ridingDepotId = 0;
 					ridingSidingId = 0;
 					ridingVehicleId = 0;
+					resetSeatingState();
 				} else {
 					if (ridingVehicleZ + movementZ > 1) {
-						// If player has left the gangway (in the +Z direction), convert back to non-gangway positioning for ridingVehicleX and Z
 						isOnGangway = false;
 						ridingVehicleX = thisCarGangwayMovementPositions1.getX(ridingVehicleX);
 						ridingVehicleZ = thisCarGangwayMovementPositions1.getZ() + ridingVehicleZ + movementZ - 1;
 						ridingPositionCache = null;
 					} else if (ridingVehicleZ + movementZ < 0) {
-						// If player has left the gangway (in the -Z direction) and consequently moved to the previous car, convert back to non-gangway positioning for ridingVehicleX and Z
 						isOnGangway = false;
 						ridingVehicleCarNumber--;
 						ridingVehicleX = previousCarGangwayMovementPositions.getX(ridingVehicleX);
 						ridingVehicleZ = previousCarGangwayMovementPositions.getZ() + ridingVehicleZ + movementZ;
 						ridingPositionCache = null;
 					} else {
-						// Gangway positioning logic
 						ridingVehicleX = Utilities.clamp(ridingVehicleX + movementX, 0, 1);
 						ridingVehicleZ += movementZ;
+
 						final Vector3d position1Min = previousCarGangwayMovementPositions.getMinWorldPosition();
 						final Vector3d position1Max = previousCarGangwayMovementPositions.getMaxWorldPosition();
 						final Vector3d position2Min = thisCarGangwayMovementPositions1.getMinWorldPosition();
 						final Vector3d position2Max = thisCarGangwayMovementPositions1.getMaxWorldPosition();
+
 						final double positionX = getFromScale(
 								getFromScale(position1Min.getXMapped(), position1Max.getXMapped(), ridingVehicleX),
 								getFromScale(position2Min.getXMapped(), position2Max.getXMapped(), ridingVehicleX),
@@ -212,44 +250,41 @@ public class VehicleRidingMovement {
 								ridingVehicleZ
 						);
 
-						// ridingPositionCache should always store the relative position of the player with respect to the riding car, even when the player is on a gangway
 						ridingPositionCache = positionAndRotation.transformBackwards(new Vector3d(positionX, positionY, positionZ), Vector3d::rotateX, Vector3d::rotateY, Vector3d::add);
 						movePlayer(positionX, positionY, positionZ);
 					}
 				}
 			} else {
 				if (thisCarGangwayMovementPositions1 != null && thisCarGangwayMovementPositions1.getPercentageZ(ridingVehicleZ + movementZ) < 1) {
-					// If player has entered the gangway (in the -Z direction), convert to gangway positioning for ridingVehicleX and Z
 					isOnGangway = true;
 					ridingVehicleX = thisCarGangwayMovementPositions1.getPercentageX(ridingVehicleX + movementX);
 					ridingVehicleZ = thisCarGangwayMovementPositions1.getPercentageZ(ridingVehicleZ + movementZ);
 					ridingPositionCache = null;
 				} else if (thisCarGangwayMovementPositions2 != null && thisCarGangwayMovementPositions2.getPercentageZ(ridingVehicleZ + movementZ) > 0) {
-					// If player has entered the gangway (in the +Z direction) and consequently moved to the next car, convert to gangway positioning for ridingVehicleX and Z
 					isOnGangway = true;
 					ridingVehicleCarNumber++;
 					ridingVehicleX = thisCarGangwayMovementPositions2.getPercentageX(ridingVehicleX + movementX);
 					ridingVehicleZ = thisCarGangwayMovementPositions2.getPercentageZ(ridingVehicleZ + movementZ);
 					ridingPositionCache = null;
 				} else {
-					// Calculate and store all the offsets that should be applied to the player to keep them in bounds of the floors
 					final ObjectArrayList<Vector3d> offsets = new ObjectArrayList<>();
+
 					clampPosition(floorsAndDoorways, ridingVehicleX + movementX - RenderVehicleHelper.HALF_PLAYER_WIDTH, ridingVehicleZ + movementZ - RenderVehicleHelper.HALF_PLAYER_WIDTH, offsets);
 					clampPosition(floorsAndDoorways, ridingVehicleX + movementX + RenderVehicleHelper.HALF_PLAYER_WIDTH, ridingVehicleZ + movementZ - RenderVehicleHelper.HALF_PLAYER_WIDTH, offsets);
 					clampPosition(floorsAndDoorways, ridingVehicleX + movementX + RenderVehicleHelper.HALF_PLAYER_WIDTH, ridingVehicleZ + movementZ + RenderVehicleHelper.HALF_PLAYER_WIDTH, offsets);
 					clampPosition(floorsAndDoorways, ridingVehicleX + movementX - RenderVehicleHelper.HALF_PLAYER_WIDTH, ridingVehicleZ + movementZ + RenderVehicleHelper.HALF_PLAYER_WIDTH, offsets);
 
 					if (offsets.isEmpty()) {
-						// Player is not standing on any floor, dismount player
 						sendUpdate(true);
 						ridingDepotId = 0;
 						ridingSidingId = 0;
 						ridingVehicleId = 0;
+						resetSeatingState();
 					} else {
-						// Find the highest amounts to clamp the player movement in both the X and Z direction and apply the clamps
 						double clampX = 0;
 						double maxY = -Double.MAX_VALUE;
 						double clampZ = 0;
+
 						for (final Vector3d offset : offsets) {
 							if (Math.abs(offset.getXMapped()) > Math.abs(clampX)) {
 								clampX = offset.getXMapped();
@@ -259,6 +294,7 @@ public class VehicleRidingMovement {
 								clampZ = offset.getZMapped();
 							}
 						}
+
 						ridingVehicleX += movementX + clampX;
 						ridingVehicleY = maxY;
 						ridingVehicleZ += movementZ + clampZ;
@@ -266,6 +302,7 @@ public class VehicleRidingMovement {
 
 					ridingPositionCache = new Vector3d(ridingVehicleX, ridingVehicleY, ridingVehicleZ);
 					final Vector3d newPlayerPosition = positionAndRotation.transformForwards(ridingPositionCache, Vector3d::rotateX, Vector3d::rotateY, Vector3d::add);
+
 					movePlayer(newPlayerPosition.getXMapped(), newPlayerPosition.getYMapped(), newPlayerPosition.getZMapped());
 					EntityHelper.setYaw(new Entity(clientPlayerEntity.data), (float) (Math.toDegrees(previousVehicleYaw - positionAndRotation.yaw) + entityYawOld));
 				}
@@ -276,9 +313,6 @@ public class VehicleRidingMovement {
 		}
 	}
 
-	/**
-	 * @return {@code null} if the player is not riding a vehicle or an {@link IntObjectImmutablePair} of the car number the player is currently riding in and the relative position and yaw of the player with respect to the center of the car they are currently riding in.
-	 */
 	@Nullable
 	public static IntObjectImmutablePair<ObjectObjectImmutablePair<Vector3d, Double>> getRidingVehicleCarNumberAndOffset(long vehicleId) {
 		return isRiding(vehicleId) ? new IntObjectImmutablePair<>(ridingVehicleCarNumberCacheOld, new ObjectObjectImmutablePair<>(ridingPositionCacheOld, ridingYawDifference)) : null;
@@ -296,22 +330,97 @@ public class VehicleRidingMovement {
 		}
 	}
 
-	/**
-	 * @param depotId the {@link org.mtr.core.data.Depot} ID
-	 * @return the driver key item that is valid for the depot ID (either a matching key or the {@link org.mtr.mod.item.ItemCreativeDriverKey})
-	 */
+	public static boolean hasSeatToggleRequest() {
+		return seatToggleRequested;
+	}
+
+	public static boolean hasSeatUseRequest() {
+		return seatUseRequested;
+	}
+
+	public static void consumeSeatUseRequest() {
+		seatUseRequested = false;
+	}
+
+	public static boolean isSeated() {
+		return isSeated;
+	}
+
+	public static void toggleSeat(long vehicleId, int carNumber, ObjectCollection<Box> seats, Vector3d playerPosition, ClientPlayerEntity clientPlayerEntity) {
+		if (!seatToggleRequested || !isRiding(vehicleId) || ridingVehicleCarNumber != carNumber) {
+			return;
+		}
+
+		applySeatToggle(seats, playerPosition, clientPlayerEntity);
+		seatToggleRequested = false;
+	}
+
+	public static void applySeatToggle(ObjectCollection<Box> seats, Vector3d playerPosition, ClientPlayerEntity clientPlayerEntity) {
+		if (isSeated) {
+			isSeated = false;
+			ridingVehicleCarNumberCacheOld = ridingVehicleCarNumber;
+			ridingPositionCacheOld = seatedPosition == null ? playerPosition : seatedPosition;
+			seatedPosition = null;
+			clientPlayerEntity.setPose(EntityPose.STANDING);
+			sendUpdate(false);
+			return;
+		}
+
+		if (seats == null || seats.isEmpty()) {
+			seatToggleRequested = false;
+			seatUseRequested = false;
+			return;
+		}
+
+		final Box seat = seats.stream().min(Comparator.comparingDouble(seatBox -> {
+			final double centerX = (seatBox.getMinXMapped() + seatBox.getMaxXMapped()) / 2;
+			final double centerY = (seatBox.getMinYMapped() + seatBox.getMaxYMapped()) / 2;
+			final double centerZ = (seatBox.getMinZMapped() + seatBox.getMaxZMapped()) / 2;
+			final double offsetX = centerX - playerPosition.getXMapped();
+			final double offsetY = centerY - playerPosition.getYMapped();
+			final double offsetZ = centerZ - playerPosition.getZMapped();
+			return offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ;
+		})).orElse(null);
+
+		if (seat == null) {
+			seatToggleRequested = false;
+			seatUseRequested = false;
+			return;
+		}
+
+		final double seatCenterX = (seat.getMinXMapped() + seat.getMaxXMapped()) / 2;
+		final double seatCenterZ = (seat.getMinZMapped() + seat.getMaxZMapped()) / 2;
+		final double seatY = seat.getMinYMapped() - 0.35;
+
+		seatedPosition = new Vector3d(seatCenterX, seatY, seatCenterZ);
+
+		isSeated = true;
+		isOnGangway = false;
+		ridingVehicleX = seatedPosition.getXMapped();
+		ridingVehicleY = seatedPosition.getYMapped();
+		ridingVehicleZ = seatedPosition.getZMapped();
+		ridingVehicleCarNumberCacheOld = ridingVehicleCarNumber;
+		ridingPositionCacheOld = seatedPosition;
+		ridingPositionCache = seatedPosition;
+
+		clientPlayerEntity.setPose(EntityPose.CROUCHING);
+		sendUpdate(false);
+	}
+
 	@Nullable
 	public static ItemDriverKey getValidHoldingKey(long depotId) {
 		final ClientPlayerEntity clientPlayerEntity = MinecraftClient.getInstance().getPlayerMapped();
 		if (clientPlayerEntity != null) {
 			final ItemStack itemStack1 = clientPlayerEntity.getMainHandStack();
 			final Item item1 = itemStack1.getItem();
+
 			if (item1.data instanceof ItemDriverKey) {
 				return ItemDepotDriverKey.isCreativeDriverKeyOrMatchesDepot(itemStack1, depotId) ? (ItemDriverKey) item1.data : null;
 			}
 
 			final ItemStack itemStack2 = clientPlayerEntity.getOffHandStack();
 			final Item item2 = itemStack2.getItem();
+
 			if (item2.data instanceof ItemDriverKey) {
 				return ItemDepotDriverKey.isCreativeDriverKeyOrMatchesDepot(itemStack2, depotId) ? (ItemDriverKey) item2.data : null;
 			}
@@ -327,6 +436,7 @@ public class VehicleRidingMovement {
 		if (shiftHoldingTicks > 0 && clientPlayerEntity != null) {
 			final int progressFilled = MathHelper.clamp((int) (shiftHoldingTicks * DISMOUNT_PROGRESS_BAR_LENGTH / SHIFT_ACTIVATE_TICKS), 0, DISMOUNT_PROGRESS_BAR_LENGTH);
 			final String progressBar = String.format("§6%s§7%s", StringUtils.repeat('|', progressFilled), StringUtils.repeat('|', DISMOUNT_PROGRESS_BAR_LENGTH - progressFilled));
+
 			clientPlayerEntity.sendMessage(TranslationProvider.GUI_MTR_DISMOUNT_HOLD.getText(InitClient.getShiftText(), progressBar), true);
 			return false;
 		} else {
@@ -334,11 +444,6 @@ public class VehicleRidingMovement {
 		}
 	}
 
-	/**
-	 * Find an intersecting floor or doorway from the player position.
-	 * If there are multiple intersecting floors or doorways, get the one with the highest Y level.
-	 * If there are no intersecting floors or doorways, find the closest floor or doorway instead.
-	 */
 	@Nullable
 	private static ObjectBooleanImmutablePair<Box> bestPosition(ObjectArrayList<ObjectBooleanImmutablePair<Box>> floorsOrDoorways, double x, double y, double z) {
 		return floorsOrDoorways.stream()
@@ -350,6 +455,7 @@ public class VehicleRidingMovement {
 					final double maxX = box.getMaxXMapped();
 					final double minZ = box.getMinZMapped();
 					final double maxZ = box.getMaxZMapped();
+
 					return (Utilities.isBetween(x, minX, maxX) ? 0 : Math.min(Math.abs(minX - x), Math.abs(maxX - x))) + (Utilities.isBetween(z, minZ, maxZ) ? 0 : Math.min(Math.abs(minZ - z), Math.abs(maxZ - z)));
 				})).orElse(null));
 	}
@@ -359,30 +465,24 @@ public class VehicleRidingMovement {
 
 		if (floorOrDoorway != null) {
 			if (floorOrDoorway.rightBoolean()) {
-				// If the intersecting or closest floor or doorway is a floor, then force the player to be in bounds
 				offsets.add(new Vector3d(
 						Utilities.clamp(x, floorOrDoorway.left().getMinXMapped(), floorOrDoorway.left().getMaxXMapped()) - x,
 						floorOrDoorway.left().getMaxYMapped(),
 						Utilities.clamp(z, floorOrDoorway.left().getMinZMapped(), floorOrDoorway.left().getMaxZMapped()) - z
 				));
 			} else if (RenderVehicleHelper.boxContains(floorOrDoorway.left(), x, ridingVehicleY, z)) {
-				// If the intersecting or closest floor or doorway is a doorway, then don't force the player to be in bounds
-				// Dismount if the player is not intersecting the doorway
 				offsets.add(new Vector3d(0, floorOrDoorway.left().getMaxYMapped(), 0));
 			}
 		}
 	}
 
-	/**
-	 * Moves the client player to absolute world coordinates right now and also at the end of the client tick.
-	 * (If the player is not moved at the end of the client tick, there will be a rubber banding animation which will look weird when moving inside a vehicle.)
-	 */
 	private static void movePlayer(double x, double y, double z) {
 		if (InitClient.getGameTick() > 40) {
 			final Runnable runnable = () -> {
 				final MinecraftClient minecraftClient = MinecraftClient.getInstance();
 				final ClientWorld clientWorld = minecraftClient.getWorldMapped();
 				final ClientPlayerEntity clientPlayerEntity = minecraftClient.getPlayerMapped();
+
 				if (clientPlayerEntity != null && clientWorld != null) {
 					clientPlayerEntity.setFallDistanceMapped(0);
 					clientPlayerEntity.setVelocity(0, 0, 0);
@@ -396,9 +496,31 @@ public class VehicleRidingMovement {
 		}
 	}
 
+	private static void resetSeatingState() {
+		shiftHoldingTicks = 0;
+		isSeated = false;
+		seatedPosition = null;
+		seatToggleRequested = false;
+		seatUseRequested = false;
+	}
+
 	private static void sendUpdate(boolean dismount) {
 		if (ridingVehicleId != 0) {
-			InitClient.REGISTRY_CLIENT.sendPacketToServer(PacketUpdateVehicleRidingEntities.create(ridingSidingId, ridingVehicleId, dismount ? -1 : ridingVehicleCarNumber, ridingVehicleX, ridingVehicleY, ridingVehicleZ, isOnGangway, isHoldingDriverKey, pressingAccelerateTicks == 1, pressingBrakeTicks == 1, pressingDoorsTicks == 1, pressingAtoTicks == 1, doorOverrideTicks > 1));
+			InitClient.REGISTRY_CLIENT.sendPacketToServer(PacketUpdateVehicleRidingEntities.create(
+					ridingSidingId,
+					ridingVehicleId,
+					dismount ? -1 : ridingVehicleCarNumber,
+					ridingVehicleX,
+					ridingVehicleY,
+					ridingVehicleZ,
+					isOnGangway,
+					isHoldingDriverKey,
+					pressingAccelerateTicks == 1,
+					pressingBrakeTicks == 1,
+					pressingDoorsTicks == 1,
+					pressingAtoTicks == 1,
+					doorOverrideTicks > 1
+			));
 			sendPositionUpdateTime = 0;
 		}
 	}

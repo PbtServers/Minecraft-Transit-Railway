@@ -3,7 +3,7 @@ import org.mtr.mod.BuildTools
 
 plugins {
 	id "net.minecraftforge.gradle" version "6.+"
-	id "org.spongepowered.mixin" version "+"
+	id "org.spongepowered.mixin" version "0.7.+"
 }
 
 final BuildTools buildTools = new BuildTools(minecraftVersion, "forge", project)
@@ -25,8 +25,10 @@ sourceSets.main.resources { srcDir "src/generated/resources" }
 
 dependencies {
 	minecraft "net.minecraftforge:forge:${minecraftVersion}-${buildTools.getForgeVersion()}"
-	annotationProcessor "org.spongepowered:mixin:+:processor"
+	annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
+
 	shadowImplementation "org.mtr:Minecraft-Mappings-forge-${minecraftVersion}:0.0.1-dev"
+	shadowImplementation "de.javagl:obj:0.4.0"
 
 	if (buildTools.hasJadeSupport()) {
 		compileOnly fg.deobf("maven.modrinth:jade:${buildTools.getJadeVersion()}")
@@ -70,6 +72,21 @@ tasks.register("setupFiles") {
 		outputs.upToDateWhen { false }
 		from "../fabric/src/main/java/org/mtr/mod"
 		into "src/main/java/org/mtr/mod"
+		filter { line ->
+			line
+					.replace("clientPlayerEntity.data.setSneaking(false);", "")
+					.replace("clientPlayerEntity.data.setSneaking(true);", "")
+					.replace("clientPlayerEntity.data.setSneaking(isSeated);", "")
+					.replace("clientPlayerEntity.setSneaking(false);", "")
+					.replace("clientPlayerEntity.setSneaking(true);", "")
+					.replace("clientPlayerEntity.setSneaking(isSeated);", "")
+					.replace("entity.data.setSneaking(false);", "")
+					.replace("entity.data.setSneaking(true);", "")
+					.replace("entity.data.setSneaking(isSeated);", "")
+					.replace("entity.setSneaking(false);", "")
+					.replace("entity.setSneaking(true);", "")
+					.replace("entity.setSneaking(isSeated);", "")
+		}
 	}
 
 	copy {
@@ -143,3 +160,57 @@ reobf {
 }
 
 assemble.dependsOn shadowJar
+
+tasks.register("unpackMtrRuntimeLibraries", Copy) {
+	outputs.upToDateWhen { false }
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+	from(zipTree("../libs/Transport-Simulation-Core-0.0.1.jar")) {
+		include "org/mtr/core/**"
+		include "org/mtr/legacy/**"
+	}
+
+	from(zipTree("../libs/Shadow-Libraries-net-0.0.1.jar")) {
+		include "org/mtr/libraries/**"
+	}
+
+	from(zipTree("../libs/Shadow-Libraries-util-0.0.1.jar")) {
+		include "org/mtr/libraries/**"
+	}
+
+	from(zipTree("../libs/Minecraft-Mappings-common-0.0.1.jar")) {
+		include "org/mtr/mapping/**"
+	}
+
+	from(zipTree("../libs/Minecraft-Mappings-forge-${minecraftVersion}-0.0.1-dev.jar")) {
+		include "org/mtr/mapping/**"
+	}
+
+	from({
+		configurations.shadowImplementation.resolvedConfiguration.resolvedArtifacts
+				.findAll { artifact -> artifact.moduleVersion.id.group == "com.logisticscraft" }
+				.collect { artifact -> zipTree(artifact.file) }
+	}) {
+		include "com/logisticscraft/**"
+	}
+
+	from({
+		configurations.shadowImplementation.resolvedConfiguration.resolvedArtifacts
+				.findAll { artifact -> artifact.moduleVersion.id.group == "de.javagl" }
+				.collect { artifact -> zipTree(artifact.file) }
+	}) {
+		include "de/javagl/**"
+	}
+
+	into layout.buildDirectory.dir("classes/java/main")
+}
+
+tasks.named("compileJava") {
+	finalizedBy tasks.named("unpackMtrRuntimeLibraries")
+}
+
+tasks.matching { task ->
+	task.name == "runClient" || task.name == "runServer"
+}.configureEach {
+	dependsOn tasks.named("unpackMtrRuntimeLibraries")
+}

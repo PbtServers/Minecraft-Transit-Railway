@@ -73,6 +73,8 @@ public class BuildTools {
 		CreateClientWorldRenderingMixin.create(minecraftVersion, loader, mixinPath, "org.mtr.mixin");
 		CreatePlayerTeleportationStateAccessor.create(minecraftVersion, loader, mixinPath, "org.mtr.mixin");
 		CreatePlayerRendererOffsetMixin.create(minecraftVersion, loader, mixinPath, "org.mtr.mixin");
+		fixClientWorldRenderingMixin();
+		fixPlayerRendererOffsetMixin();
 	}
 
 	public String getFabricVersion() {
@@ -402,6 +404,210 @@ public class BuildTools {
 
 	private static String removeLastLine(String text) {
 		return text.substring(0, text.lastIndexOf("\n"));
+	}
+
+	private void fixClientWorldRenderingMixin() throws IOException {
+		final String mixinContent;
+		if (loader.equals("fabric")) {
+			mixinContent = "package org.mtr.mixin;\n" +
+					"\n" +
+					"import com.google.common.collect.Lists;\n" +
+					"import net.minecraft.client.world.ClientWorld;\n" +
+					"import net.minecraft.entity.Entity;\n" +
+					"import org.mtr.mod.client.WorldRenderingHelper;\n" +
+					"import org.spongepowered.asm.mixin.Mixin;\n" +
+					"import org.spongepowered.asm.mixin.injection.At;\n" +
+					"import org.spongepowered.asm.mixin.injection.Inject;\n" +
+					"import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;\n" +
+					"\n" +
+					"import java.util.List;\n" +
+					"\n" +
+					"@Mixin(ClientWorld.class)\n" +
+					"public abstract class ClientWorldRenderingMixin {\n" +
+					"\n" +
+					"\t@Inject(method = \"getEntities\", at = @At(value = \"RETURN\"), cancellable = true)\n" +
+					"\tprivate void getEntities(CallbackInfoReturnable<Iterable<Entity>> callbackInfoReturnable) {\n" +
+					"\t\tfinal Object entity = WorldRenderingHelper.getWorldRenderingEntity((Object) this);\n" +
+					"\t\tif (entity instanceof Entity) {\n" +
+					"\t\t\tfinal List<Entity> entities = Lists.newArrayList(callbackInfoReturnable.getReturnValue());\n" +
+					"\t\t\tentities.add((Entity) entity);\n" +
+					"\t\t\tcallbackInfoReturnable.setReturnValue(entities);\n" +
+					"\t\t}\n" +
+					"\t}\n" +
+					"}\n";
+		} else {
+			mixinContent = "package org.mtr.mixin;\n" +
+					"\n" +
+					"import com.google.common.collect.Lists;\n" +
+					"import net.minecraft.client.multiplayer.ClientLevel;\n" +
+					"import net.minecraft.world.entity.Entity;\n" +
+					"import org.mtr.mod.client.WorldRenderingHelper;\n" +
+					"import org.spongepowered.asm.mixin.Mixin;\n" +
+					"import org.spongepowered.asm.mixin.injection.At;\n" +
+					"import org.spongepowered.asm.mixin.injection.Inject;\n" +
+					"import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;\n" +
+					"\n" +
+					"import java.util.List;\n" +
+					"\n" +
+					"@Mixin(ClientLevel.class)\n" +
+					"public abstract class ClientWorldRenderingMixin {\n" +
+					"\n" +
+					"\t@Inject(method = \"entitiesForRendering\", at = @At(value = \"RETURN\"), cancellable = true)\n" +
+					"\tprivate void getEntities(CallbackInfoReturnable<Iterable<Entity>> callbackInfoReturnable) {\n" +
+					"\t\tfinal Object entity = WorldRenderingHelper.getWorldRenderingEntity((Object) this);\n" +
+					"\t\tif (entity instanceof Entity) {\n" +
+					"\t\t\tfinal List<Entity> entities = Lists.newArrayList(callbackInfoReturnable.getReturnValue());\n" +
+					"\t\t\tentities.add((Entity) entity);\n" +
+					"\t\t\tcallbackInfoReturnable.setReturnValue(entities);\n" +
+					"\t\t}\n" +
+					"\t}\n" +
+					"}\n";
+		}
+
+		final String helperContent = "package org.mtr.mod.client;\n" +
+				"\n" +
+				"import org.mtr.mapping.holder.World;\n" +
+				"import org.mtr.mapping.mapper.EntityExtension;\n" +
+				"import org.mtr.mapping.registry.RegistryClient;\n" +
+				"\n" +
+				"import javax.annotation.Nullable;\n" +
+				"import java.lang.reflect.Constructor;\n" +
+				"\n" +
+				"public final class WorldRenderingHelper {\n" +
+				"\n" +
+				"\tprivate WorldRenderingHelper() {\n" +
+				"\t}\n" +
+				"\n" +
+				"\t@Nullable\n" +
+				"\tpublic static Object getWorldRenderingEntity(Object worldObject) {\n" +
+				"\t\tif (RegistryClient.worldRenderingEntity == null) {\n" +
+				"\t\t\treturn null;\n" +
+				"\t\t}\n" +
+				"\n" +
+				"\t\tfinal World world = wrapWorld(worldObject);\n" +
+				"\t\tif (world == null) {\n" +
+				"\t\t\treturn null;\n" +
+				"\t\t}\n" +
+				"\n" +
+				"\t\tfinal EntityExtension entityExtension = RegistryClient.worldRenderingEntity.apply(world);\n" +
+				"\t\treturn entityExtension;\n" +
+				"\t}\n" +
+				"\n" +
+				"\t@Nullable\n" +
+				"\tprivate static World wrapWorld(Object worldObject) {\n" +
+				"\t\tfor (final Constructor<?> constructor : World.class.getConstructors()) {\n" +
+				"\t\t\tfinal Class<?>[] parameterTypes = constructor.getParameterTypes();\n" +
+				"\t\t\tif (parameterTypes.length == 1 && parameterTypes[0].isInstance(worldObject)) {\n" +
+				"\t\t\t\ttry {\n" +
+				"\t\t\t\t\treturn (World) constructor.newInstance(worldObject);\n" +
+				"\t\t\t\t} catch (Exception ignored) {\n" +
+				"\t\t\t\t\treturn null;\n" +
+				"\t\t\t\t}\n" +
+				"\t\t\t}\n" +
+				"\t\t}\n" +
+				"\n" +
+				"\t\treturn null;\n" +
+				"\t}\n" +
+				"}\n";
+
+		final Path mixinFile = path.resolve("src/main/java/org/mtr/mixin/ClientWorldRenderingMixin.java");
+		final Path helperFile = path.resolve("src/main/java/org/mtr/mod/client/WorldRenderingHelper.java");
+		Files.createDirectories(helperFile.getParent());
+		FileUtils.write(mixinFile.toFile(), mixinContent, StandardCharsets.UTF_8);
+		FileUtils.write(helperFile.toFile(), helperContent, StandardCharsets.UTF_8);
+	}
+
+	private void fixPlayerRendererOffsetMixin() throws IOException {
+		final String mixinContent;
+		if (loader.equals("fabric")) {
+			mixinContent = "package org.mtr.mixin;\n" +
+					"\n" +
+					"import net.minecraft.client.network.AbstractClientPlayerEntity;\n" +
+					"import net.minecraft.client.render.entity.PlayerEntityRenderer;\n" +
+					"import net.minecraft.util.math.Vec3d;\n" +
+					"import org.mtr.mod.client.PlayerRenderHelper;\n" +
+					"import org.spongepowered.asm.mixin.Mixin;\n" +
+					"import org.spongepowered.asm.mixin.injection.At;\n" +
+					"import org.spongepowered.asm.mixin.injection.Inject;\n" +
+					"import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;\n" +
+					"\n" +
+					"@Mixin(PlayerEntityRenderer.class)\n" +
+					"public abstract class PlayerRendererOffsetMixin {\n" +
+					"\n" +
+					"\t@Inject(method = \"getPositionOffset(Lnet/minecraft/client/network/AbstractClientPlayerEntity;F)Lnet/minecraft/util/math/Vec3d;\", at = @At(value = \"RETURN\"), cancellable = true)\n" +
+					"\tpublic void getRenderOffset(AbstractClientPlayerEntity abstractClientPlayerEntity, float f, CallbackInfoReturnable<Vec3d> callbackInfoReturnable) {\n" +
+					"\t\tif (PlayerRenderHelper.shouldHidePlayer((Object) abstractClientPlayerEntity)) {\n" +
+					"\t\t\tcallbackInfoReturnable.setReturnValue(new Vec3d(0, -1000, 0));\n" +
+					"\t\t}\n" +
+					"\t}\n" +
+					"}\n";
+		} else {
+			mixinContent = "package org.mtr.mixin;\n" +
+					"\n" +
+					"import net.minecraft.client.player.AbstractClientPlayer;\n" +
+					"import net.minecraft.world.phys.Vec3;\n" +
+					"import org.mtr.mod.client.PlayerRenderHelper;\n" +
+					"import org.spongepowered.asm.mixin.Mixin;\n" +
+					"import org.spongepowered.asm.mixin.injection.At;\n" +
+					"import org.spongepowered.asm.mixin.injection.Inject;\n" +
+					"import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;\n" +
+					"\n" +
+					"@Mixin(net.minecraft.client.renderer.entity.player.PlayerRenderer.class)\n" +
+					"public abstract class PlayerRendererOffsetMixin {\n" +
+					"\n" +
+					"\t@Inject(method = \"getRenderOffset(Lnet/minecraft/client/player/AbstractClientPlayer;F)Lnet/minecraft/world/phys/Vec3;\", at = @At(value = \"RETURN\"), cancellable = true)\n" +
+					"\tpublic void getRenderOffset(AbstractClientPlayer abstractClientPlayer, float f, CallbackInfoReturnable<Vec3> callbackInfoReturnable) {\n" +
+					"\t\tif (PlayerRenderHelper.shouldHidePlayer((Object) abstractClientPlayer)) {\n" +
+					"\t\t\tcallbackInfoReturnable.setReturnValue(new Vec3(0, -1000, 0));\n" +
+					"\t\t}\n" +
+					"\t}\n" +
+					"}\n";
+		}
+
+		final String helperContent = "package org.mtr.mod.client;\n" +
+				"\n" +
+				"import org.mtr.mapping.mapper.EntityHelper;\n" +
+				"\n" +
+				"import java.lang.reflect.Method;\n" +
+				"import java.util.UUID;\n" +
+				"\n" +
+				"public final class PlayerRenderHelper {\n" +
+				"\n" +
+				"\tprivate PlayerRenderHelper() {\n" +
+				"\t}\n" +
+				"\n" +
+				"\tpublic static boolean shouldHidePlayer(Object playerObject) {\n" +
+				"\t\tfinal UUID uuid = getUuid(playerObject);\n" +
+				"\t\treturn uuid != null && EntityHelper.HIDDEN_PLAYERS.stream().anyMatch(hiddenUuid -> hiddenUuid.equals(uuid));\n" +
+				"\t}\n" +
+				"\n" +
+				"\tprivate static UUID getUuid(Object playerObject) {\n" +
+				"\t\tif (playerObject == null) {\n" +
+				"\t\t\treturn null;\n" +
+				"\t\t}\n" +
+				"\n" +
+				"\t\ttry {\n" +
+				"\t\t\tfinal Method getUuidMethod = playerObject.getClass().getMethod(\"getUuid\");\n" +
+				"\t\t\tfinal Object uuidObject = getUuidMethod.invoke(playerObject);\n" +
+				"\t\t\treturn uuidObject instanceof UUID ? (UUID) uuidObject : null;\n" +
+				"\t\t} catch (Exception ignored) {\n" +
+				"\t\t}\n" +
+				"\n" +
+				"\t\ttry {\n" +
+				"\t\t\tfinal Method getUuidMethod = playerObject.getClass().getMethod(\"getUUID\");\n" +
+				"\t\t\tfinal Object uuidObject = getUuidMethod.invoke(playerObject);\n" +
+				"\t\t\treturn uuidObject instanceof UUID ? (UUID) uuidObject : null;\n" +
+				"\t\t} catch (Exception ignored) {\n" +
+				"\t\t\treturn null;\n" +
+				"\t\t}\n" +
+				"\t}\n" +
+				"}\n";
+
+		final Path mixinFile = path.resolve("src/main/java/org/mtr/mixin/PlayerRendererOffsetMixin.java");
+		final Path helperFile = path.resolve("src/main/java/org/mtr/mod/client/PlayerRenderHelper.java");
+		Files.createDirectories(helperFile.getParent());
+		FileUtils.write(mixinFile.toFile(), mixinContent, StandardCharsets.UTF_8);
+		FileUtils.write(helperFile.toFile(), helperContent, StandardCharsets.UTF_8);
 	}
 
 	private static class Patreon implements Comparable<Patreon> {
