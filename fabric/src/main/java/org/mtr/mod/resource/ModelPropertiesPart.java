@@ -159,7 +159,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 						addCube(texture, modelParts, materialGroupsForPartConditionAndRenderStageDoorsClosed, x, y, z, flipped);
 						final Box box = addBox(mutableBox.get(), x, y, z, flipped);
 						partDetailsList.add(new PartDetails(modelParts, optimizedModelDoor, box, x, y, z, flipped));
-						if (type == PartType.SEAT) {
+						if (isSeat()) {
 							seats.add(box);
 						}
 					});
@@ -210,7 +210,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 					addObjModelPosition(objModels, objModelsForPartConditionAndRenderStageDoorsClosed, x, y, z, flipped, modelYOffset);
 					final Box box = addBox(mutableBox.get(), x, y, z, flipped);
 					partDetailsList.add(new PartDetails(new ObjectArrayList<>(), optimizedModelDoor.get(), box, x, y, z, flipped));
-					if (type == PartType.SEAT) {
+					if (isSeat()) {
 						seats.add(box);
 					}
 				});
@@ -320,6 +320,20 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 					checkDoorway.getMaxZMapped()
 			))).ifPresent(closestDoorway -> partDetails.doorway = closestDoorway));
 		}
+	}
+
+	private boolean isSeat() {
+		if (type == PartType.SEAT) {
+			return true;
+		}
+
+		for (final String name : names) {
+			if ("seat".equalsIgnoreCase(name) || name.toLowerCase().contains("seat")) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private boolean isDoor() {

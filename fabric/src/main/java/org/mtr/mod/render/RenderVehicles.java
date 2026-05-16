@@ -130,9 +130,6 @@ public class RenderVehicles implements IGui {
 						final Vector3d playerPosition = absoluteVehicleCarPositionAndRotation.transformBackwards(clientPlayerEntity.getPos(), Vector3d::rotateX, Vector3d::rotateY, Vector3d::add);
 						// Vehicle resource cache
 						final VehicleResourceCache vehicleResourceCache = vehicleResource.getCachedVehicleResource(carNumber, vehicle.vehicleExtraData.immutableVehicleCars.size(), false);
-						if (vehicleResourceCache != null && VehicleRidingMovement.hasSeatToggleRequest() && ridingCarNumber == carNumber) {
-							VehicleRidingMovement.toggleSeat(vehicle.getId(), carNumber, vehicleResourceCache.seats, playerPosition, clientPlayerEntity);
-						}
 						if (vehicleResourceCache != null && VehicleRidingMovement.hasSeatUseRequest() && ridingCarNumber == carNumber) {
 							final Box clickedSeat = getClickedSeat(absoluteVehicleCarPositionAndRotation, vehicleResourceCache.seats, cameraPosition, camera.getYaw(), camera.getPitch());
 							if (clickedSeat != null) {
@@ -192,7 +189,10 @@ public class RenderVehicles implements IGui {
 									floorsAndDoorways.add(new ObjectBooleanImmutablePair<>(floor, true));
 									if (!VehicleRidingMovement.isRiding(vehicle.getId())) {
 										final ItemDriverKey driverKey = VehicleRidingMovement.getValidHoldingKey(vehicle.vehicleExtraData.getDepotId());
-										if (driverKey != null && (driverKey.canBoardAnyVehicle || vehicle.vehicleExtraData.getIsManualAllowed())) {
+										if (
+												VehicleRidingMovement.hasSeatToggleRequest()
+														|| driverKey != null && (driverKey.canBoardAnyVehicle || vehicle.vehicleExtraData.getIsManualAllowed())
+										) {
 											openFloorsAndDoorways.add(floor);
 										}
 									}
@@ -348,6 +348,10 @@ public class RenderVehicles implements IGui {
 									vehicleResource.hasGangway2() ? gangwayMovementPositions2 : null,
 									absoluteVehicleCarPositionAndRotation
 							);
+
+							if (vehicleResourceCache != null && VehicleRidingMovement.hasSeatToggleRequest()) {
+								VehicleRidingMovement.toggleSeat(vehicle.getId(), carNumber, vehicleResourceCache.seats, playerPosition, clientPlayerEntity);
+							}
 						}
 
 						previousGangwayMovementPositions.gangwayMovementPositions = gangwayMovementPositions2;

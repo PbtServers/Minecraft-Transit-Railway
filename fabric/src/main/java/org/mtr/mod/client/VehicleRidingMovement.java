@@ -51,6 +51,7 @@ public class VehicleRidingMovement {
 	private static int doorOverrideTicks;
 	private static boolean seatToggleRequested;
 	private static boolean seatToggleKeyPressedLastTick;
+	private static int seatToggleRequestTicks;
 	private static boolean seatUseRequested;
 	private static boolean isSeated;
 	private static Vector3d seatedPosition;
@@ -60,6 +61,7 @@ public class VehicleRidingMovement {
 	private static final int RIDING_COOLDOWN = 5;
 	private static final int SHIFT_ACTIVATE_TICKS = 30;
 	private static final int DISMOUNT_PROGRESS_BAR_LENGTH = 30;
+	private static final int SEAT_TOGGLE_REQUEST_TIMEOUT = 10;
 
 	public static void tick() {
 		final MinecraftClient minecraftClient = MinecraftClient.getInstance();
@@ -67,10 +69,19 @@ public class VehicleRidingMovement {
 		final boolean seatToggleKeyPressed = KeyBindings.TRAIN_TOGGLE_SITTING.isPressed();
 		final boolean sneakKeyPressed = minecraftClient.getOptionsMapped().getKeySneakMapped().isPressed();
 
-		if (seatToggleKeyPressed && !seatToggleKeyPressedLastTick && ridingVehicleId != 0) {
+		if (seatToggleKeyPressed && !seatToggleKeyPressedLastTick) {
 			seatToggleRequested = true;
+			seatToggleRequestTicks = SEAT_TOGGLE_REQUEST_TIMEOUT;
 		}
 		seatToggleKeyPressedLastTick = seatToggleKeyPressed;
+
+		if (seatToggleRequested) {
+			if (seatToggleRequestTicks > 0) {
+				seatToggleRequestTicks--;
+			} else {
+				seatToggleRequested = false;
+			}
+		}
 
 		// Click derecho desactivado temporalmente. Antes sentaba al jugador al hacer click en cualquier parte del vehículo.
 		seatUseRequested = false;
@@ -151,6 +162,7 @@ public class VehicleRidingMovement {
 					ridingPositionCache = null;
 					ridingYawDifference = null;
 					previousVehicleYaw = yaw;
+
 					if (ridingVehicleId == 0) {
 						sendUpdate(false);
 					}
@@ -353,6 +365,7 @@ public class VehicleRidingMovement {
 
 		applySeatToggle(seats, playerPosition, clientPlayerEntity);
 		seatToggleRequested = false;
+		seatToggleRequestTicks = 0;
 	}
 
 	public static void applySeatToggle(ObjectCollection<Box> seats, Vector3d playerPosition, ClientPlayerEntity clientPlayerEntity) {
@@ -368,6 +381,7 @@ public class VehicleRidingMovement {
 
 		if (seats == null || seats.isEmpty()) {
 			seatToggleRequested = false;
+			seatToggleRequestTicks = 0;
 			seatUseRequested = false;
 			return;
 		}
@@ -384,6 +398,7 @@ public class VehicleRidingMovement {
 
 		if (seat == null) {
 			seatToggleRequested = false;
+			seatToggleRequestTicks = 0;
 			seatUseRequested = false;
 			return;
 		}
@@ -500,7 +515,6 @@ public class VehicleRidingMovement {
 		shiftHoldingTicks = 0;
 		isSeated = false;
 		seatedPosition = null;
-		seatToggleRequested = false;
 		seatUseRequested = false;
 	}
 
