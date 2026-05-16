@@ -5,9 +5,13 @@ license = "MIT"
 [[mods]]
 modId = "mtr"
 version = "@version@"
-displayName = "Minecraft Transit Railway (PbtinaDev's Edition)"
-authors = ["Jonathan Ho", "PbtinaDev (Fork)"]
-description = "Un mod de Minecraft con sistemas de trenes automatizados."
+displayName = "Minecraft Transit Railway (PbtinaDev's Edition) [Unofficial Fork]"
+authors = "Jonathan Ho - original author, PbtinaDev - unofficial fork maintainer"
+description = '''
+Unofficial fork of Minecraft Transit Railway.
+
+This project is not affiliated with, endorsed by, or maintained by the original Minecraft Transit Railway developers.
+'''
 logoFile = "icon.png"
 
 [[dependencies.mtr]]
