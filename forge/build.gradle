@@ -210,7 +210,13 @@ tasks.named("compileJava") {
 }
 
 tasks.matching { task ->
-	task.name == "runClient" || task.name == "runServer"
+    task.name in ["jar", "javadoc", "shadowJar", "sourcesJar", "reobfJar"]
 }.configureEach {
-	dependsOn tasks.named("unpackMtrRuntimeLibraries")
+    dependsOn tasks.named("unpackMtrRuntimeLibraries")
+}
+
+tasks.matching { task ->
+    task.name == "runClient" || task.name == "runServer"
+}.configureEach {
+    dependsOn tasks.named("unpackMtrRuntimeLibraries")
 }
