@@ -118,6 +118,14 @@ tasks.register("setupFiles") {
 	WebserverSetup.setup(project.rootDir, "fabric/", "mod")
 }
 
+tasks.named("processResources") {
+	dependsOn tasks.named("setupFiles")
+}
+
+tasks.named("compileJava") {
+	dependsOn tasks.named("setupFiles")
+}
+
 build {
 	doLast {
 		buildTools.copyBuildFile(excludeAssets == "true")

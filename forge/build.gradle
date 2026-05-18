@@ -144,6 +144,10 @@ tasks.register("setupFiles") {
 	}
 }
 
+tasks.named("processResources") {
+	dependsOn tasks.named("setupFiles")
+}
+
 build {
 	doLast {
 		buildTools.copyBuildFile(excludeAssets == "true")
@@ -206,6 +210,7 @@ tasks.register("unpackMtrRuntimeLibraries", Copy) {
 }
 
 tasks.named("compileJava") {
+	dependsOn tasks.named("setupFiles")
 	finalizedBy tasks.named("unpackMtrRuntimeLibraries")
 }
 
