@@ -9,6 +9,9 @@ import org.mtr.mapping.mapper.OptimizedRenderer;
 import org.mtr.mod.Init;
 
 import javax.annotation.Nullable;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -71,14 +74,60 @@ public final class OptimizedModelWrapper {
 
 	public static final class ObjModelWrapper {
 
+		@Nullable
+		private static final Field RAW_MESHES_FIELD = getObjModelField("rawMeshes");
+		@Nullable
+		private static final Constructor<OptimizedModel.ObjModel> OBJ_MODEL_CONSTRUCTOR = getObjModelConstructor();
 		public final OptimizedModel.ObjModel objModel;
 
 		public ObjModelWrapper(OptimizedModel.ObjModel objModel) {
 			this.objModel = objModel;
 		}
 
+		@Nullable
+		public ObjModelWrapper copy() {
+			final OptimizedModel.ObjModel copiedObjModel = cloneObjModel(objModel);
+			return copiedObjModel == null ? null : new ObjModelWrapper(copiedObjModel);
+		}
+
 		public void addTransformation(OptimizedModel.ShaderType shaderType, double x, double y, double z, boolean flipped) {
 			objModel.addTransformation(shaderType, x, y, z, flipped);
+		}
+
+		@Nullable
+		private static OptimizedModel.ObjModel cloneObjModel(OptimizedModel.ObjModel objModel) {
+			if (RAW_MESHES_FIELD == null || OBJ_MODEL_CONSTRUCTOR == null) {
+				return null;
+			}
+
+			try {
+				final List<?> rawMeshes = (List<?>) RAW_MESHES_FIELD.get(objModel);
+				return OBJ_MODEL_CONSTRUCTOR.newInstance(rawMeshes, false, objModel.getMinX(), objModel.getMinY(), objModel.getMinZ(), objModel.getMaxX(), objModel.getMaxY(), objModel.getMaxZ());
+			} catch (Exception e) {
+				return null;
+			}
+		}
+
+		@Nullable
+		private static Field getObjModelField(String name) {
+			try {
+				final Field field = OptimizedModel.ObjModel.class.getDeclaredField(name);
+				field.setAccessible(true);
+				return field;
+			} catch (Exception e) {
+				return null;
+			}
+		}
+
+		@Nullable
+		private static Constructor<OptimizedModel.ObjModel> getObjModelConstructor() {
+			try {
+				final Constructor<OptimizedModel.ObjModel> constructor = OptimizedModel.ObjModel.class.getDeclaredConstructor(List.class, boolean.class, float.class, float.class, float.class, float.class, float.class, float.class);
+				constructor.setAccessible(true);
+				return constructor;
+			} catch (Exception e) {
+				return null;
+			}
 		}
 	}
 }

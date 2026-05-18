@@ -29,7 +29,7 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 
 	private static final String DEFAULT_OBJ_GROUP = "default";
 	private static final double FALLBACK_DEFAULT_OBJ_SCALE = 0.999;
-private static final String[] GLASS_TEXTURE_HINTS = {"fenster", "window", "glass", "tint", "reflexion", "reflex", "alpha", "opacity"};
+	private static final String[] GLASS_TEXTURE_HINTS = {"fenster", "window", "glass", "tint", "reflexion", "reflex", "alpha", "opacity"};
 	private static final String[] DISPLAY_TEXTURE_HINTS = {"matrix", "display", "lcd", "led", "route", "ziel"};
 	private static final String[] INTERIOR_TEXTURE_HINTS = {"interior", "lights_interior", "cockpit", "driver", "seat", "seats"};
 	private static final String[] DOOR_TEXTURE_HINTS = {"tuer", "door", "fafhrertuer"};
@@ -110,6 +110,7 @@ private static final String[] GLASS_TEXTURE_HINTS = {"fenster", "window", "glass
 		final int[] matchedGroups = {0};
 
 		modelProperties.iterateParts(modelPropertiesPart -> {
+			final int objModelCountBefore = countObjWrappers(flattenByPartCondition(objModelsForPartConditionAndRenderStage)) + countObjWrappers(flattenByPartCondition(objModelsForPartConditionAndRenderStageDoorsClosed));
 			modelPropertiesPart.writeCache(
 					nameToObjModels,
 					positionDefinitions,
@@ -120,7 +121,10 @@ private static final String[] GLASS_TEXTURE_HINTS = {"fenster", "window", "glass
 					objModelsForPartConditionAndRenderStageDoorsClosed,
 					modelProperties.getModelYOffset()
 			);
-			matchedGroups[0]++;
+			final int objModelCountAfter = countObjWrappers(flattenByPartCondition(objModelsForPartConditionAndRenderStage)) + countObjWrappers(flattenByPartCondition(objModelsForPartConditionAndRenderStageDoorsClosed));
+			if (objModelCountAfter > objModelCountBefore) {
+				matchedGroups[0]++;
+			}
 		});
 
 		applyLegacyDefaultObjFallback(nameToObjModels, modelProperties, matchedGroups[0], debugObjResource);
@@ -214,6 +218,12 @@ private static final String[] GLASS_TEXTURE_HINTS = {"fenster", "window", "glass
 		final ObjectArrayList<T> combinedList = new ObjectArrayList<>();
 		collection.forEach(combinedList::addAll);
 		return combinedList;
+	}
+
+	private static <T> Object2ObjectOpenHashMap<PartCondition, ObjectArrayList<T>> flattenByPartCondition(Object2ObjectOpenHashMap<PartCondition, Object2ObjectOpenHashMap<RenderStage, ObjectArrayList<T>>> values) {
+		final Object2ObjectOpenHashMap<PartCondition, ObjectArrayList<T>> flattenedValues = new Object2ObjectOpenHashMap<>();
+		values.forEach((partCondition, renderStageMap) -> flattenedValues.put(partCondition, flattenCollection(renderStageMap.values())));
+		return flattenedValues;
 	}
 
 	private void applyLegacyDefaultObjFallback(Object2ObjectAVLTreeMap<String, OptimizedModel.ObjModel> nameToObjModels, ModelProperties modelProperties, int matchedGroups, @Nullable String debugObjResource) {

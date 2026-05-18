@@ -24,7 +24,6 @@ import org.mtr.mod.render.StoredMatrixTransformations;
 import javax.annotation.Nullable;
 import java.util.Comparator;
 import java.util.Map;
-import java.util.function.Supplier;
 
 public final class ModelPropertiesPart extends ModelPropertiesPartSchema implements IGui {
 
@@ -189,7 +188,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 	) {
 		final ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper> objModels = new ObjectArrayList<>();
 		final MutableBox mutableBox = new MutableBox();
-		final Supplier<OptimizedModelWrapper> optimizedModelDoor;
+		final OptimizedModelWrapper optimizedModelDoor;
 
 		names.forEach(name -> {
 			final OptimizedModel.ObjModel objModel = nameToObjModels.get(name);
@@ -199,7 +198,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 			}
 		});
 
-		optimizedModelDoor = () -> isDoor() ? OptimizedModelWrapper.fromObjModels(objModels) : null;
+		optimizedModelDoor = isDoor() ? OptimizedModelWrapper.fromObjModels(objModels) : null;
 
 		positionDefinitions.forEach(positionDefinitionName -> positionDefinitionsObject.getPositionDefinition(positionDefinitionName, (positions, positionsFlipped) -> {
 			if (type == PartType.NORMAL || type == PartType.SEAT) {
@@ -209,7 +208,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 					}
 					addObjModelPosition(objModels, objModelsForPartConditionAndRenderStageDoorsClosed, x, y, z, flipped, modelYOffset);
 					final Box box = addBox(mutableBox.get(), x, y, z, flipped);
-					partDetailsList.add(new PartDetails(new ObjectArrayList<>(), optimizedModelDoor.get(), box, x, y, z, flipped));
+					partDetailsList.add(new PartDetails(new ObjectArrayList<>(), optimizedModelDoor, box, x, y, z, flipped));
 					if (isSeat()) {
 						seats.add(box);
 					}
@@ -573,8 +572,11 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 	) {
 		objModels.forEach(objModel -> Data.put(objModelsForPartConditionAndRenderStage, condition, renderStage, oldValue -> {
 			final ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper> newObjModels = oldValue == null ? new ObjectArrayList<>() : oldValue;
-			objModel.addTransformation(renderStage.shaderType, (x + doorAnimationType.getDoorAnimationX(doorXMultiplier, flipped, 0)) / 16, y / 16 - modelYOffset, (z + doorAnimationType.getDoorAnimationZ(doorZMultiplier, flipped, 0, false)) / 16, flipped);
-			newObjModels.add(objModel);
+			final OptimizedModelWrapper.ObjModelWrapper positionedObjModel = objModel.copy();
+			if (positionedObjModel != null) {
+				positionedObjModel.addTransformation(renderStage.shaderType, (x + doorAnimationType.getDoorAnimationX(doorXMultiplier, flipped, 0)) / 16, y / 16 - modelYOffset, (z + doorAnimationType.getDoorAnimationZ(doorZMultiplier, flipped, 0, false)) / 16, flipped);
+				newObjModels.add(positionedObjModel);
+			}
 			return newObjModels;
 		}, Object2ObjectOpenHashMap::new));
 	}

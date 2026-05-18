@@ -1,0 +1,7 @@
+--> MTR Mod: PbtinaDev's Edition // [v1.0.0]
+
+- Add 600km/h Limit to Airplanes with Special High Speed Runway.
+
+- Update speed wheel on manual driving to reflect new speed limit.
+
+- Add option to sit on vehicle seat when pressing key C (Default)
