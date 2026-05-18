@@ -1,5 +1,6 @@
 package org.mtr.mod.resource;
 
+import org.apache.commons.lang3.StringUtils;
 import org.mtr.core.data.Data;
 import org.mtr.core.data.Vehicle;
 import org.mtr.core.serializer.ReaderBase;
@@ -191,8 +192,8 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 			double modelYOffset
 	) {
 		final ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper> objModels = new ObjectArrayList<>();
-		final ObjectArrayList<ObjectArrayList<ModelDisplayPart>> modelDisplayParts = new ObjectArrayList<>();
 		final MutableBox mutableBox = new MutableBox();
+		final ObjectArrayList<ObjectArrayList<ModelDisplayPart>> objDisplayParts = new ObjectArrayList<>();
 		final Supplier<OptimizedModelWrapper> optimizedModelDoor;
 		final int[] matchedGroups = {0};
 
@@ -203,10 +204,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 				mutableBox.add(new Box(-objModel.getMinX(), -objModel.getMinY(), -objModel.getMinZ(), -objModel.getMaxX(), -objModel.getMaxY(), -objModel.getMaxZ()));
 				matchedGroups[0]++;
 				if (type == PartType.DISPLAY) {
-					final ModelDisplayPart modelDisplayPart = createObjDisplayPart(objModel);
-					if (modelDisplayPart != null) {
-						modelDisplayParts.add(ObjectArrayList.of(modelDisplayPart));
-					}
+					logRejectedObjDisplay(name, objModel, "OBJ display disabled; BBModel display should handle text");
 				}
 			}
 		});
@@ -214,25 +212,32 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 		optimizedModelDoor = () -> isDoor() ? OptimizedModelWrapper.fromObjModels(objModels) : null;
 
 		positionDefinitions.forEach(positionDefinitionName -> positionDefinitionsObject.getPositionDefinition(positionDefinitionName, (positions, positionsFlipped) -> {
-			if (type == PartType.NORMAL || type == PartType.SEAT) {
-				iteratePositions(positions, positionsFlipped, (x, y, z, flipped) -> {
-					if (!isDoor()) {
-						addObjModelPosition(objModels, objModelsForPartConditionAndRenderStage, x, y, z, flipped, modelYOffset);
-					}
-					addObjModelPosition(objModels, objModelsForPartConditionAndRenderStageDoorsClosed, x, y, z, flipped, modelYOffset);
-					final Box box = addBox(mutableBox.get(), x, y, z, flipped);
-					partDetailsList.add(new PartDetails(new ObjectArrayList<>(), optimizedModelDoor.get(), box, x, y, z, flipped));
-					if (isSeat()) {
-						seats.add(box);
-					}
-				});
-			} else if (type == PartType.DISPLAY && !modelDisplayParts.isEmpty()) {
-				iteratePositions(positions, positionsFlipped, (x, y, z, flipped) -> displayPartDetailsList.add(new DisplayPartDetails(modelDisplayParts, x, y, z, flipped)));
+			switch (type) {
+				case NORMAL:
+				case SEAT:
+					iteratePositions(positions, positionsFlipped, (x, y, z, flipped) -> {
+						if (!isDoor()) {
+							addObjModelPosition(objModels, objModelsForPartConditionAndRenderStage, x, y, z, flipped, modelYOffset);
+						}
+						addObjModelPosition(objModels, objModelsForPartConditionAndRenderStageDoorsClosed, x, y, z, flipped, modelYOffset);
+						final Box box = addBox(mutableBox.get(), x, y, z, flipped);
+						partDetailsList.add(new PartDetails(new ObjectArrayList<>(), optimizedModelDoor.get(), box, x, y, z, flipped));
+						if (isSeat()) {
+							seats.add(box);
+						}
+					});
+					break;
+				case DISPLAY:
+					break;
+				case FLOOR:
+				case DOORWAY:
+					break;
 			}
 		}));
 
 		return matchedGroups[0];
 	}
+
 
 	public void render(Identifier texture, StoredMatrixTransformations storedMatrixTransformations, @Nullable VehicleExtension vehicle, int carNumber, int[] scrollingDisplayIndexTracker, int light, ObjectArrayList<ObjectDoubleImmutablePair<Box>> openDoorways, boolean fromResourcePackCreator, boolean renderDisplaysAfterOptimized) {
 		if (vehicle == null || VehicleResource.matchesCondition(vehicle, condition, openDoorways.isEmpty())) {
@@ -674,42 +679,217 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 	}
 
 	@Nullable
-	private static ModelDisplayPart createObjDisplayPart(OptimizedModel.ObjModel objModel) {
-		final double minX = objModel.getMinX();
-		final double minY = objModel.getMinY();
-		final double minZ = objModel.getMinZ();
-		final double maxX = objModel.getMaxX();
-		final double maxY = objModel.getMaxY();
-		final double maxZ = objModel.getMaxZ();
-		final double sizeX = Math.abs(maxX - minX);
-		final double sizeY = Math.abs(maxY - minY);
-		final double sizeZ = Math.abs(maxZ - minZ);
-		final double centerX = (minX + maxX) / 2;
-		final double centerY = (minY + maxY) / 2;
-		final double centerZ = (minZ + maxZ) / 2;
-		final ModelDisplayPart modelDisplayPart = new ModelDisplayPart();
+	private ModelDisplayPart createSafeObjDisplayPart(String name, OptimizedModel.ObjModel objModel) {
+		final ObjectArrayList<DisplayPlaneCandidate> candidates = new ObjectArrayList<>();
+		final java.util.List<?> rawMeshes = getObjModelRawMeshes(objModel);
 
-		if (sizeX <= sizeY && sizeX <= sizeZ) {
-			modelDisplayPart.storedMatrixTransformations.add(graphicsHolder -> {
-				graphicsHolder.translate(centerX, minY, minZ);
-				graphicsHolder.rotateYDegrees(90);
+		if (rawMeshes != null) {
+			rawMeshes.forEach(rawMesh -> {
+				final DisplayPlaneCandidate candidate = createDisplayPlaneCandidateFromRawMesh(name, rawMesh);
+				if (candidate != null) {
+					candidates.add(candidate);
+				}
 			});
-			modelDisplayPart.width = Math.max(1, (int) Math.round(sizeZ * 16));
-			modelDisplayPart.height = Math.max(1, (int) Math.round(sizeY * 16));
-		} else if (sizeZ <= sizeX && sizeZ <= sizeY) {
-			modelDisplayPart.storedMatrixTransformations.add(graphicsHolder -> graphicsHolder.translate(minX, minY, centerZ));
-			modelDisplayPart.width = Math.max(1, (int) Math.round(sizeX * 16));
-			modelDisplayPart.height = Math.max(1, (int) Math.round(sizeY * 16));
-		} else {
-			modelDisplayPart.storedMatrixTransformations.add(graphicsHolder -> {
-				graphicsHolder.translate(minX, centerY, minZ);
-				graphicsHolder.rotateXDegrees(-90);
-			});
-			modelDisplayPart.width = Math.max(1, (int) Math.round(sizeX * 16));
-			modelDisplayPart.height = Math.max(1, (int) Math.round(sizeZ * 16));
 		}
 
-		return modelDisplayPart.width > 0 && modelDisplayPart.height > 0 ? modelDisplayPart : null;
+		if (candidates.isEmpty()) {
+			final DisplayPlaneCandidate wholeModelCandidate = createDisplayPlaneCandidateFromBounds(
+					name,
+					-objModel.getMinX(), -objModel.getMinY(), -objModel.getMinZ(),
+					-objModel.getMaxX(), -objModel.getMaxY(), -objModel.getMaxZ(),
+					"obj-model-bounds"
+			);
+
+			if (wholeModelCandidate != null) {
+				candidates.add(wholeModelCandidate);
+			}
+		}
+
+		if (candidates.isEmpty()) {
+			return null;
+		}
+
+		candidates.sort((candidate1, candidate2) -> Double.compare(candidate2.area, candidate1.area));
+		final DisplayPlaneCandidate candidate = candidates.get(0);
+
+		final ModelDisplayPart modelDisplayPart = new ModelDisplayPart();
+
+        // ObjModel usa coordenadas ya escaladas al mundo/modelo.
+		// ModelDisplayPart.width/height, en cambio, se interpretan como unidades /16 durante el render.
+		modelDisplayPart.width = Math.max(1, (int) Math.round(candidate.width * 16));
+		modelDisplayPart.height = Math.max(1, (int) Math.round(candidate.height * 16));
+
+		modelDisplayPart.storedMatrixTransformations.add(graphicsHolder -> {
+			// El centro del ObjModel ya está en coordenadas de modelo; no dividir entre 16 aquí.
+			graphicsHolder.translate(candidate.centerX, candidate.centerY, candidate.centerZ);
+
+			switch (candidate.normalAxis) {
+				case "X":
+					graphicsHolder.rotateYDegrees(90);
+					break;
+				case "Z":
+				default:
+					break;
+			}
+
+			// Tras escalar width/height a /16, el tamaño real en render será candidate.width/candidate.height.
+			graphicsHolder.translate(-candidate.width / 2, -candidate.height / 2, 0);
+		});
+
+		logObjDisplayCandidate(name, candidate.width, candidate.height, candidate.thickness, candidate.normalAxis, true, "accepted " + candidate.source);
+		return modelDisplayPart;
+	}
+
+	@Nullable
+	private DisplayPlaneCandidate createDisplayPlaneCandidateFromRawMesh(String name, Object rawMesh) {
+		try {
+			final java.util.List<?> vertices = (java.util.List<?>) rawMesh.getClass().getField("vertices").get(rawMesh);
+			if (vertices == null || vertices.isEmpty()) {
+				return null;
+			}
+
+			double minX = Double.MAX_VALUE;
+			double minY = Double.MAX_VALUE;
+			double minZ = Double.MAX_VALUE;
+			double maxX = -Double.MAX_VALUE;
+			double maxY = -Double.MAX_VALUE;
+			double maxZ = -Double.MAX_VALUE;
+
+			for (final Object vertex : vertices) {
+				final Object position = vertex.getClass().getField("position").get(vertex);
+				final double x = -((Number) position.getClass().getMethod("getX").invoke(position)).doubleValue();
+				final double y = -((Number) position.getClass().getMethod("getY").invoke(position)).doubleValue();
+				final double z = -((Number) position.getClass().getMethod("getZ").invoke(position)).doubleValue();
+
+				minX = Math.min(minX, x);
+				minY = Math.min(minY, y);
+				minZ = Math.min(minZ, z);
+				maxX = Math.max(maxX, x);
+				maxY = Math.max(maxY, y);
+				maxZ = Math.max(maxZ, z);
+			}
+
+			return createDisplayPlaneCandidateFromBounds(name, minX, minY, minZ, maxX, maxY, maxZ, "raw-mesh");
+		} catch (Exception ignored) {
+			return null;
+		}
+	}
+
+	@Nullable
+	private DisplayPlaneCandidate createDisplayPlaneCandidateFromBounds(String name, double rawMinX, double rawMinY, double rawMinZ, double rawMaxX, double rawMaxY, double rawMaxZ, String source) {
+		final double minX = Math.min(rawMinX, rawMaxX);
+		final double minY = Math.min(rawMinY, rawMaxY);
+		final double minZ = Math.min(rawMinZ, rawMaxZ);
+		final double maxX = Math.max(rawMinX, rawMaxX);
+		final double maxY = Math.max(rawMinY, rawMaxY);
+		final double maxZ = Math.max(rawMinZ, rawMaxZ);
+
+		final double sizeX = maxX - minX;
+		final double sizeY = maxY - minY;
+		final double sizeZ = maxZ - minZ;
+
+		final String normalAxis;
+		final double width;
+		final double height;
+		final double thickness;
+
+		if (sizeZ <= sizeX && sizeZ <= sizeY) {
+			normalAxis = "Z";
+			width = sizeX;
+			height = sizeY;
+			thickness = sizeZ;
+		} else if (sizeX <= sizeY && sizeX <= sizeZ) {
+			normalAxis = "X";
+			width = sizeZ;
+			height = sizeY;
+			thickness = sizeX;
+		} else {
+			normalAxis = "Y";
+			width = sizeX;
+			height = sizeZ;
+			thickness = sizeY;
+		}
+
+		if (width <= 0 || height <= 0) {
+			logObjDisplayCandidate(name, width, height, thickness, normalAxis, false, "zero dimensions " + source);
+			return null;
+		}
+
+		// Estos valores están en coordenadas de modelo/bloques, no en píxeles.
+		if (width > 8 || height > 3) {
+			logObjDisplayCandidate(name, width, height, thickness, normalAxis, false, "too large " + source);
+			return null;
+		}
+
+		if (thickness > 0.5) {
+			logObjDisplayCandidate(name, width, height, thickness, normalAxis, false, "too thick " + source);
+			return null;
+		}
+
+		if (normalAxis.equals("Y")) {
+			logObjDisplayCandidate(name, width, height, thickness, normalAxis, false, "horizontal display plane rejected " + source);
+			return null;
+		}
+
+		final double area = width * height;
+		if (area <= 0) {
+			logObjDisplayCandidate(name, width, height, thickness, normalAxis, false, "zero area " + source);
+			return null;
+		}
+
+		return new DisplayPlaneCandidate(
+				(minX + maxX) / 2,
+				(minY + maxY) / 2,
+				(minZ + maxZ) / 2,
+				width,
+				height,
+				thickness,
+				area,
+				normalAxis,
+				source
+		);
+	}
+
+	@Nullable
+	private java.util.List<?> getObjModelRawMeshes(OptimizedModel.ObjModel objModel) {
+		try {
+			final java.lang.reflect.Field rawMeshesField = OptimizedModel.ObjModel.class.getDeclaredField("rawMeshes");
+			rawMeshesField.setAccessible(true);
+			return (java.util.List<?>) rawMeshesField.get(objModel);
+		} catch (Exception ignored) {
+			return null;
+		}
+	}
+
+	private void logObjDisplayCandidate(String name, double width, double height, double thickness, String normalAxis, boolean accepted, String reason) {
+		final String key = "obj-display-candidate:" + name + ":" + accepted + ":" + reason;
+		if (LOGGED_DISPLAY_DEBUG_KEYS.add(key)) {
+			Init.LOGGER.info("[MTR DISPLAY DEBUG] obj display candidate part={} width={} height={} thickness={} normalAxis={} accepted={} reason={}", name, width, height, thickness, normalAxis, accepted, reason);
+		}
+	}
+
+	private void logObjDisplayAdded(String positionDefinitionName, double x, double y, double z, boolean flipped) {
+		final String key = "obj-display-added:" + getDebugDisplayPartName() + ":" + positionDefinitionName + ":" + flipped;
+		if (LOGGED_DISPLAY_DEBUG_KEYS.add(key)) {
+			Init.LOGGER.info("[MTR DISPLAY DEBUG] displayPartDetails added part={} positionDefinition={} x={} y={} z={} flipped={}", getDebugDisplayPartName(), positionDefinitionName, x, y, z, flipped);
+		}
+	}
+
+
+	private void logRejectedObjDisplay(String name, OptimizedModel.ObjModel objModel, String reason) {
+		if (!(StringUtils.containsIgnoreCase(name, "display") || StringUtils.containsIgnoreCase(name, "matrix") || StringUtils.containsIgnoreCase(name, "lcd") || StringUtils.containsIgnoreCase(name, "ziel") || StringUtils.containsIgnoreCase(name, "destination"))) {
+			return;
+		}
+		final String key = "obj-display-reject:" + name;
+		if (!LOGGED_DISPLAY_DEBUG_KEYS.add(key)) {
+			return;
+		}
+		final double width = Math.abs(objModel.getMaxX() - objModel.getMinX());
+		final double height = Math.abs(objModel.getMaxY() - objModel.getMinY());
+		final double depth = Math.abs(objModel.getMaxZ() - objModel.getMinZ());
+		Init.LOGGER.info("[MTR DISPLAY DEBUG] display part={} width={} height={} depth={} source=obj-bbox", name, width, height, depth);
+		Init.LOGGER.info("[MTR DISPLAY DEBUG] display transform=<rejected>");
+		Init.LOGGER.info("[MTR DISPLAY DEBUG] display rejected reason={}", reason);
 	}
 
 	private String formatText(Vehicle vehicle) {
@@ -870,6 +1050,32 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 			return defaultValue;
 		}
 	}
+
+	private static final class DisplayPlaneCandidate {
+
+		private final double centerX;
+		private final double centerY;
+		private final double centerZ;
+		private final double width;
+		private final double height;
+		private final double thickness;
+		private final double area;
+		private final String normalAxis;
+		private final String source;
+
+		private DisplayPlaneCandidate(double centerX, double centerY, double centerZ, double width, double height, double thickness, double area, String normalAxis, String source) {
+			this.centerX = centerX;
+			this.centerY = centerY;
+			this.centerZ = centerZ;
+			this.width = width;
+			this.height = height;
+			this.thickness = thickness;
+			this.area = area;
+			this.normalAxis = normalAxis;
+			this.source = source;
+		}
+	}
+
 
 	private static class PartDetails {
 

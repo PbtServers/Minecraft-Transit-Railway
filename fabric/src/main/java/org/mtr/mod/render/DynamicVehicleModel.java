@@ -126,7 +126,9 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 		if (debugBbModel && LOGGED_DEBUG_KEYS.add("render_bbmodel")) {
 			Init.LOGGER.info("[MTR OBJ DEBUG] rendering bbmodel=true");
 		}
-		modelProperties.iterateParts(modelPropertiesPart -> modelPropertiesPart.render(texture, storedMatrixTransformations, vehicle, carNumber, scrollingDisplayIndexTracker, light, openDoorways, fromResourcePackCreator, debugBbModel));
+
+		final boolean renderDisplaysAfterOptimized = debugBbModel || debugObjResource != null;
+		modelProperties.iterateParts(modelPropertiesPart -> modelPropertiesPart.render(texture, storedMatrixTransformations, vehicle, carNumber, scrollingDisplayIndexTracker, light, openDoorways, fromResourcePackCreator, renderDisplaysAfterOptimized));
 	}
 
 	public void writeFloorsAndDoorways(

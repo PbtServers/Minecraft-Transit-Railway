@@ -122,11 +122,6 @@ public class VehicleRidingMovement {
 
 		if (ridingVehicleId == 0) {
 			resetSeatingState();
-
-			final ClientPlayerEntity clientPlayerEntity = minecraftClient.getPlayerMapped();
-			if (clientPlayerEntity != null) {
-				clientPlayerEntity.setPose(EntityPose.STANDING);
-			}
 		} else {
 			if (KeyBindings.LIFT_MENU.isPressed()) {
 				final Screen currentScreen = minecraftClient.getCurrentScreenMapped();
@@ -142,8 +137,8 @@ public class VehicleRidingMovement {
 				shiftHoldingTicks = 0;
 			}
 
-			if (clientPlayerEntity != null) {
-				clientPlayerEntity.setPose(isSeated ? EntityPose.CROUCHING : EntityPose.STANDING);
+			if (clientPlayerEntity != null && isSeated) {
+				clientPlayerEntity.setPose(EntityPose.CROUCHING);
 			}
 		}
 	}
@@ -358,6 +353,10 @@ public class VehicleRidingMovement {
 
 	public static boolean isSeated() {
 		return isSeated;
+	}
+
+	public static boolean isRidingVehicle() {
+		return ridingVehicleId != 0;
 	}
 
 	public static void toggleSeat(long vehicleId, int carNumber, ObjectCollection<Box> seats, Vector3d playerPosition, ClientPlayerEntity clientPlayerEntity) {
