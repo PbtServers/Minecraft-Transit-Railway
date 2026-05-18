@@ -137,6 +137,9 @@ public class MainRenderer extends EntityRenderer<EntityRendering> implements IGu
 						case LIGHT_2:
 							renderLayer = MoreRenderLayers.getLight2(key);
 							break;
+						case TEXT_SEE_THROUGH:
+							renderLayer = MoreRenderLayers.getTextSeeThrough(key);
+							break;
 						case INTERIOR:
 							renderLayer = MoreRenderLayers.getInterior(key);
 							break;
@@ -162,9 +165,10 @@ public class MainRenderer extends EntityRenderer<EntityRendering> implements IGu
 					value.forEach(renderer -> renderer.accept(graphicsHolder, offset));
 				});
 			}
+			if (i == 0) {
+				CustomResourceLoader.OPTIMIZED_RENDERER_WRAPPER.render(!Config.getClient().getHideTranslucentParts());
+			}
 		}
-
-		CustomResourceLoader.OPTIMIZED_RENDERER_WRAPPER.render(!Config.getClient().getHideTranslucentParts());
 	}
 
 	public static void scheduleRender(@Nullable Identifier identifier, boolean priority, QueuedRenderLayer queuedRenderLayer, BiConsumer<GraphicsHolder, Vector3d> callback) {
@@ -175,6 +179,10 @@ public class MainRenderer extends EntityRenderer<EntityRendering> implements IGu
 
 	public static void scheduleRender(QueuedRenderLayer queuedRenderLayer, BiConsumer<GraphicsHolder, Vector3d> callback) {
 		scheduleRender(new Identifier(Init.MOD_ID, "textures/block/white.png"), false, queuedRenderLayer, callback);
+	}
+
+	public static void scheduleRender(boolean priority, QueuedRenderLayer queuedRenderLayer, BiConsumer<GraphicsHolder, Vector3d> callback) {
+		scheduleRender(new Identifier(Init.MOD_ID, "textures/block/white.png"), priority, queuedRenderLayer, callback);
 	}
 
 	public static void cancelRender(Identifier identifier) {

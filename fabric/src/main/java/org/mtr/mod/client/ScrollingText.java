@@ -35,6 +35,14 @@ public class ScrollingText implements IGui {
 	}
 
 	public void scrollText(StoredMatrixTransformations storedMatrixTransformations) {
+		scrollText(storedMatrixTransformations, true, QueuedRenderLayer.LIGHT_2);
+	}
+
+	public void scrollText(StoredMatrixTransformations storedMatrixTransformations, boolean priority) {
+		scrollText(storedMatrixTransformations, priority, QueuedRenderLayer.LIGHT_2);
+	}
+
+	public void scrollText(StoredMatrixTransformations storedMatrixTransformations, boolean priority, QueuedRenderLayer queuedRenderLayer) {
 		if (dynamicResource != null) {
 			final int pixelScale = isFullPixel ? 1 : RouteMapGenerator.PIXEL_SCALE;
 			final double scale = availableHeight / dynamicResource.height;
@@ -43,7 +51,7 @@ public class ScrollingText implements IGui {
 			final int totalSteps = widthSteps + imageSteps;
 			final int step = Math.round((InitClient.getGameTick() - ticksOffset) * scrollSpeed) % totalSteps;
 			final double width = Math.min(Math.min(availableWidth, dynamicResource.width * scale), Math.min(step * pixelScale * scale, (totalSteps - step) * pixelScale * scale));
-			MainRenderer.scheduleRender(dynamicResource.identifier, true, QueuedRenderLayer.LIGHT_2, (graphicsHolder, offset) -> {
+			MainRenderer.scheduleRender(dynamicResource.identifier, priority, queuedRenderLayer, (graphicsHolder, offset) -> {
 				storedMatrixTransformations.transform(graphicsHolder, offset);
 				IDrawing.drawTexture(graphicsHolder, (float) (Math.max(widthSteps - step, 0) * scale * pixelScale), 0, (float) width, (float) availableHeight, Math.max((float) (step - widthSteps) / imageSteps, 0), 0, Math.min((float) step / imageSteps, 1), 1, Direction.UP, ARGB_WHITE, GraphicsHolder.getDefaultLight());
 				graphicsHolder.pop();

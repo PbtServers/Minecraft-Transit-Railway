@@ -2,6 +2,7 @@ package org.mtr.mod.resource;
 
 import org.mtr.core.serializer.ReaderBase;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectSet;
 import org.mtr.mapping.holder.Identifier;
 import org.mtr.mod.generated.resource.ModelPropertiesSchema;
@@ -133,6 +134,42 @@ public final class ModelProperties extends ModelPropertiesSchema {
 
 	public void iterateParts(Consumer<ModelPropertiesPart> consumer) {
 		parts.forEach(consumer);
+	}
+
+	public boolean hasDisplayParts() {
+		for (final ModelPropertiesPart modelPropertiesPart : parts) {
+			if (modelPropertiesPart.isDisplayPart()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public boolean hasDoorParts() {
+		for (final ModelPropertiesPart modelPropertiesPart : parts) {
+			if (modelPropertiesPart.isDoorPart()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public ObjectLinkedOpenHashSet<String> getDoorPartNames() {
+		final ObjectLinkedOpenHashSet<String> doorPartNames = new ObjectLinkedOpenHashSet<>();
+		for (final ModelPropertiesPart modelPropertiesPart : parts) {
+			if (modelPropertiesPart.isDoorPart()) {
+				doorPartNames.addAll(modelPropertiesPart.getDebugNames());
+			}
+		}
+		return doorPartNames;
+	}
+
+	public ObjectLinkedOpenHashSet<String> getAllPartNames() {
+		final ObjectLinkedOpenHashSet<String> partNames = new ObjectLinkedOpenHashSet<>();
+		for (final ModelPropertiesPart modelPropertiesPart : parts) {
+			partNames.addAll(modelPropertiesPart.getDebugNames());
+		}
+		return partNames;
 	}
 
 	public double getModelYOffset() {

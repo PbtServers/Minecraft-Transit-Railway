@@ -11,6 +11,7 @@ public class MoreRenderLayers {
 	private static final Object2ObjectOpenHashMap<Identifier, RenderLayer> LIGHT_CACHE = new Object2ObjectOpenHashMap<>();
 	private static final Object2ObjectOpenHashMap<Identifier, RenderLayer> LIGHT_TRANSLUCENT_CACHE = new Object2ObjectOpenHashMap<>();
 	private static final Object2ObjectOpenHashMap<Identifier, RenderLayer> LIGHT_2_CACHE = new Object2ObjectOpenHashMap<>();
+	private static final Object2ObjectOpenHashMap<Identifier, RenderLayer> TEXT_SEE_THROUGH_CACHE = new Object2ObjectOpenHashMap<>();
 	private static final Object2ObjectOpenHashMap<Identifier, RenderLayer> INTERIOR_CACHE = new Object2ObjectOpenHashMap<>();
 	private static final Object2ObjectOpenHashMap<Identifier, RenderLayer> INTERIOR_TRANSLUCENT_CACHE = new Object2ObjectOpenHashMap<>();
 	private static final Object2ObjectOpenHashMap<Identifier, RenderLayer> EXTERIOR_CACHE = new Object2ObjectOpenHashMap<>();
@@ -20,6 +21,7 @@ public class MoreRenderLayers {
 		LIGHT_CACHE.remove(identifier);
 		LIGHT_TRANSLUCENT_CACHE.remove(identifier);
 		LIGHT_2_CACHE.remove(identifier);
+		TEXT_SEE_THROUGH_CACHE.remove(identifier);
 		INTERIOR_CACHE.remove(identifier);
 		INTERIOR_TRANSLUCENT_CACHE.remove(identifier);
 		EXTERIOR_CACHE.remove(identifier);
@@ -32,6 +34,10 @@ public class MoreRenderLayers {
 
 	public static RenderLayer getLight2(Identifier texture) {
 		return checkCache(texture, () -> RenderLayer.getText(texture), LIGHT_2_CACHE);
+	}
+
+	public static RenderLayer getTextSeeThrough(Identifier texture) {
+		return checkCache(texture, () -> RenderLayer.getTextSeeThrough(texture), TEXT_SEE_THROUGH_CACHE);
 	}
 
 	public static RenderLayer getInterior(Identifier texture) {
