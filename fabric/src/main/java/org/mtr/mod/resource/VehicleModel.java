@@ -345,11 +345,6 @@ public final class VehicleModel extends VehicleModelSchema {
 		final List<?> displayMeshes = rebuiltObjModels.containsKey("display") ? getRawMeshes(rebuiltObjModels.get("display")) : null;
 		Init.LOGGER.info("[MTR DISPLAY DEBUG] reconstructed display meshes={}", displayMeshes == null ? 0 : displayMeshes.size());
 		Init.LOGGER.info("[MTR DISPLAY DEBUG] reconstructed display textures={}", reconstructedTexturesByObject.getOrDefault("display", new ObjectLinkedOpenHashSet<>()));
-		modelProperties.iterateParts(modelPropertiesPart -> {
-			if (modelPropertiesPart.isDisplayPart() || modelPropertiesPart.getDebugNames().stream().anyMatch(name -> StringUtils.containsIgnoreCase(name, "display") || StringUtils.containsIgnoreCase(name, "matrix") || StringUtils.containsIgnoreCase(name, "lcd") || StringUtils.containsIgnoreCase(name, "led") || StringUtils.containsIgnoreCase(name, "destination") || StringUtils.containsIgnoreCase(name, "ziel"))) {
-				Init.LOGGER.info("[MTR DISPLAY DEBUG] modelProperties display candidate name={} type={} renderStage={} condition={}", modelPropertiesPart.getDebugNames(), modelPropertiesPart.getDebugType(), modelPropertiesPart.getDebugRenderStage(), modelPropertiesPart.getDebugCondition());
-			}
-		});
 	}
 
 	private static ObjectArrayList<String> sampleMapKeys(Object2ObjectAVLTreeMap<String, ?> map) {

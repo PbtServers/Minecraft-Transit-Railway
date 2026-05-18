@@ -1,6 +1,5 @@
 package org.mtr.mod.resource;
 
-import org.apache.commons.lang3.StringUtils;
 import org.mtr.core.data.Data;
 import org.mtr.core.data.Vehicle;
 import org.mtr.core.serializer.ReaderBase;
@@ -21,7 +20,6 @@ import org.mtr.mod.generated.resource.ModelPropertiesPartSchema;
 import org.mtr.mod.render.MainRenderer;
 import org.mtr.mod.render.QueuedRenderLayer;
 import org.mtr.mod.render.StoredMatrixTransformations;
-import com.mojang.blaze3d.systems.RenderSystem;
 
 import javax.annotation.Nullable;
 import java.util.Comparator;
@@ -30,8 +28,6 @@ import java.util.function.Supplier;
 
 public final class ModelPropertiesPart extends ModelPropertiesPartSchema implements IGui {
 
-	private static final ObjectOpenHashSet<String> LOGGED_DISPLAY_DEBUG_KEYS = new ObjectOpenHashSet<>();
-	private static final float DEBUG_DISPLAY_DEPTH_MULTIPLIER = 2;
 	private final ObjectArrayList<PartDetails> partDetailsList = new ObjectArrayList<>();
 	private final ObjectArrayList<DisplayPartDetails> displayPartDetailsList = new ObjectArrayList<>();
 	private final int displayColorCjkInt;
@@ -181,7 +177,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 		}));
 	}
 
-	public int writeCache(
+	public void writeCache(
 			Map<String, OptimizedModel.ObjModel> nameToObjModels,
 			PositionDefinitions positionDefinitionsObject,
 			ObjectArraySet<Box> floors,
@@ -193,53 +189,36 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 	) {
 		final ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper> objModels = new ObjectArrayList<>();
 		final MutableBox mutableBox = new MutableBox();
-		final ObjectArrayList<ObjectArrayList<ModelDisplayPart>> objDisplayParts = new ObjectArrayList<>();
 		final Supplier<OptimizedModelWrapper> optimizedModelDoor;
-		final int[] matchedGroups = {0};
 
 		names.forEach(name -> {
 			final OptimizedModel.ObjModel objModel = nameToObjModels.get(name);
 			if (objModel != null) {
 				objModels.add(new OptimizedModelWrapper.ObjModelWrapper(objModel));
 				mutableBox.add(new Box(-objModel.getMinX(), -objModel.getMinY(), -objModel.getMinZ(), -objModel.getMaxX(), -objModel.getMaxY(), -objModel.getMaxZ()));
-				matchedGroups[0]++;
-				if (type == PartType.DISPLAY) {
-					logRejectedObjDisplay(name, objModel, "OBJ display disabled; BBModel display should handle text");
-				}
 			}
 		});
 
 		optimizedModelDoor = () -> isDoor() ? OptimizedModelWrapper.fromObjModels(objModels) : null;
 
 		positionDefinitions.forEach(positionDefinitionName -> positionDefinitionsObject.getPositionDefinition(positionDefinitionName, (positions, positionsFlipped) -> {
-			switch (type) {
-				case NORMAL:
-				case SEAT:
-					iteratePositions(positions, positionsFlipped, (x, y, z, flipped) -> {
-						if (!isDoor()) {
-							addObjModelPosition(objModels, objModelsForPartConditionAndRenderStage, x, y, z, flipped, modelYOffset);
-						}
-						addObjModelPosition(objModels, objModelsForPartConditionAndRenderStageDoorsClosed, x, y, z, flipped, modelYOffset);
-						final Box box = addBox(mutableBox.get(), x, y, z, flipped);
-						partDetailsList.add(new PartDetails(new ObjectArrayList<>(), optimizedModelDoor.get(), box, x, y, z, flipped));
-						if (isSeat()) {
-							seats.add(box);
-						}
-					});
-					break;
-				case DISPLAY:
-					break;
-				case FLOOR:
-				case DOORWAY:
-					break;
+			if (type == PartType.NORMAL || type == PartType.SEAT) {
+				iteratePositions(positions, positionsFlipped, (x, y, z, flipped) -> {
+					if (!isDoor()) {
+						addObjModelPosition(objModels, objModelsForPartConditionAndRenderStage, x, y, z, flipped, modelYOffset);
+					}
+					addObjModelPosition(objModels, objModelsForPartConditionAndRenderStageDoorsClosed, x, y, z, flipped, modelYOffset);
+					final Box box = addBox(mutableBox.get(), x, y, z, flipped);
+					partDetailsList.add(new PartDetails(new ObjectArrayList<>(), optimizedModelDoor.get(), box, x, y, z, flipped));
+					if (isSeat()) {
+						seats.add(box);
+					}
+				});
 			}
 		}));
-
-		return matchedGroups[0];
 	}
 
-
-	public void render(Identifier texture, StoredMatrixTransformations storedMatrixTransformations, @Nullable VehicleExtension vehicle, int carNumber, int[] scrollingDisplayIndexTracker, int light, ObjectArrayList<ObjectDoubleImmutablePair<Box>> openDoorways, boolean fromResourcePackCreator, boolean renderDisplaysAfterOptimized) {
+	public void render(Identifier texture, StoredMatrixTransformations storedMatrixTransformations, @Nullable VehicleExtension vehicle, int carNumber, int[] scrollingDisplayIndexTracker, int light, ObjectArrayList<ObjectDoubleImmutablePair<Box>> openDoorways, boolean fromResourcePackCreator) {
 		if (vehicle == null || VehicleResource.matchesCondition(vehicle, condition, openDoorways.isEmpty())) {
 			switch (type) {
 				case NORMAL:
@@ -254,18 +233,14 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 				case DISPLAY:
 					if (vehicle != null) {
 						if (displayType == DisplayType.ROUTE_COLOR || displayType == DisplayType.ROUTE_COLOR_ROUNDED) {
-							logDisplayDebug("renderLineColor called", renderDisplaysAfterOptimized);
-							renderLineColor(storedMatrixTransformations, vehicle, fromResourcePackCreator, renderDisplaysAfterOptimized);
+							renderLineColor(storedMatrixTransformations, vehicle, fromResourcePackCreator);
 						} else {
 							if (displayOptions.contains(DisplayOption.SEVEN_SEGMENT.toString())) {
-								logDisplayDebug("renderSevenSegmentDisplay called", renderDisplaysAfterOptimized);
-								renderSevenSegmentDisplay(storedMatrixTransformations, vehicle, renderDisplaysAfterOptimized);
+								renderSevenSegmentDisplay(storedMatrixTransformations, vehicle);
 							} else if (displayOptions.contains(DisplayOption.SCROLL_NORMAL.toString()) || displayOptions.contains(DisplayOption.SCROLL_LIGHT_RAIL.toString())) {
-								logDisplayDebug("renderScrollingDisplay called", renderDisplaysAfterOptimized);
-								renderScrollingDisplay(storedMatrixTransformations, vehicle, carNumber, scrollingDisplayIndexTracker, renderDisplaysAfterOptimized);
+								renderScrollingDisplay(storedMatrixTransformations, vehicle, carNumber, scrollingDisplayIndexTracker);
 							} else {
-								logDisplayDebug("renderDisplay called", renderDisplaysAfterOptimized);
-								renderDisplay(storedMatrixTransformations, vehicle, renderDisplaysAfterOptimized);
+								renderDisplay(storedMatrixTransformations, vehicle);
 							}
 						}
 					}
@@ -347,6 +322,18 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 		}
 	}
 
+	public boolean isDisplayPart() {
+		return type == PartType.DISPLAY;
+	}
+
+	public boolean isDoorPart() {
+		return isDoor();
+	}
+
+	public ObjectLinkedOpenHashSet<String> getDebugNames() {
+		return new ObjectLinkedOpenHashSet<>(names);
+	}
+
 	private boolean isSeat() {
 		if (type == PartType.SEAT) {
 			return true;
@@ -420,18 +407,15 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 		graphicsHolder.pop();
 	}
 
-	private void renderLineColor(StoredMatrixTransformations storedMatrixTransformations, VehicleExtension vehicle, boolean fromResourcePackCreator, boolean priority) {
+	private void renderLineColor(StoredMatrixTransformations storedMatrixTransformations, VehicleExtension vehicle, boolean fromResourcePackCreator) {
 		final int color;
 		if (fromResourcePackCreator) {
 			color = ARGB_BLACK | rainbowColor();
 		} else {
 			color = getOrDefault(ARGB_BLACK | vehicle.vehicleExtraData.getThisRouteColor(), ARGB_BLACK | vehicle.vehicleExtraData.getNextRouteColor(), ARGB_BLACK | vehicle.vehicleExtraData.getPreviousRouteColor(), 0, vehicle);
 		}
-		final double displayDepthOffset = getDisplayDepthOffset(priority);
-		final QueuedRenderLayer queuedRenderLayer = getDisplayRenderLayer(priority);
-		logScheduledDisplay(queuedRenderLayer.toString(), priority, displayDepthOffset);
 
-		MainRenderer.scheduleRender(new Identifier(Init.MOD_ID, String.format("textures/block/%s.png", displayType == DisplayType.ROUTE_COLOR ? "white" : "sign/circle")), priority, queuedRenderLayer, (graphicsHolder, offset) -> {
+		MainRenderer.scheduleRender(new Identifier(Init.MOD_ID, String.format("textures/block/%s.png", displayType == DisplayType.ROUTE_COLOR ? "white" : "sign/circle")), true, QueuedRenderLayer.LIGHT_2, (graphicsHolder, offset) -> {
 			storedMatrixTransformations.transform(graphicsHolder, offset);
 
 			displayPartDetailsList.forEach(displayPartDetails -> {
@@ -441,7 +425,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 
 				displayPartDetails.modelDisplayParts.forEach(displayParts -> displayParts.forEach(displayPart -> {
 					displayPart.storedMatrixTransformations.transform(graphicsHolder, Vector3d.getZeroMapped());
-					graphicsHolder.translate(displayXPadding / 16, displayYPadding / 16, -displayDepthOffset);
+					graphicsHolder.translate(displayXPadding / 16, displayYPadding / 16, -SMALL_OFFSET);
 					IDrawing.drawTexture(
 							graphicsHolder,
 							0,
@@ -461,14 +445,11 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 		});
 	}
 
-	private void renderSevenSegmentDisplay(StoredMatrixTransformations storedMatrixTransformations, VehicleExtension vehicle, boolean priority) {
+	private void renderSevenSegmentDisplay(StoredMatrixTransformations storedMatrixTransformations, VehicleExtension vehicle) {
 		final String text = formatText(vehicle);
 		final HorizontalAlignment horizontalAlignment = getHorizontalAlignment(false);
-		final double displayDepthOffset = getDisplayDepthOffset(priority);
-		final QueuedRenderLayer queuedRenderLayer = getDisplayRenderLayer(priority);
-		logScheduledDisplay(queuedRenderLayer.toString(), priority, displayDepthOffset);
 
-		MainRenderer.scheduleRender(new Identifier(Init.MOD_ID, "textures/overlay/seven_segment.png"), priority, queuedRenderLayer, (graphicsHolder, offset) -> {
+		MainRenderer.scheduleRender(new Identifier(Init.MOD_ID, "textures/overlay/seven_segment.png"), true, QueuedRenderLayer.LIGHT_2, (graphicsHolder, offset) -> {
 			storedMatrixTransformations.transform(graphicsHolder, offset);
 
 			displayPartDetailsList.forEach(displayPartDetails -> {
@@ -478,7 +459,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 
 				displayPartDetails.modelDisplayParts.forEach(displayParts -> displayParts.forEach(displayPart -> {
 					displayPart.storedMatrixTransformations.transform(graphicsHolder, Vector3d.getZeroMapped());
-					graphicsHolder.translate(0, displayYPadding / 16, -displayDepthOffset);
+					graphicsHolder.translate(0, displayYPadding / 16, -SMALL_OFFSET);
 					IDrawing.drawSevenSegment(
 							graphicsHolder,
 							text,
@@ -498,11 +479,9 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 		});
 	}
 
-	private void renderScrollingDisplay(StoredMatrixTransformations storedMatrixTransformations, VehicleExtension vehicle, int carNumber, int[] scrollingDisplayIndexTracker, boolean priority) {
+	private void renderScrollingDisplay(StoredMatrixTransformations storedMatrixTransformations, VehicleExtension vehicle, int carNumber, int[] scrollingDisplayIndexTracker) {
 		final String text = formatText(vehicle);
 		final ObjectArrayList<ScrollingText> scrollingTexts = vehicle.persistentVehicleData.getScrollingText(carNumber);
-		final double displayDepthOffset = getDisplayDepthOffset(priority);
-		final QueuedRenderLayer queuedRenderLayer = getDisplayRenderLayer(priority);
 
 		displayPartDetailsList.forEach(displayPartDetails -> {
 			final StoredMatrixTransformations storedMatrixTransformations1 = storedMatrixTransformations.copy();
@@ -514,7 +493,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 			displayPartDetails.modelDisplayParts.forEach(displayParts -> displayParts.forEach(displayPart -> {
 				final StoredMatrixTransformations storedMatrixTransformations2 = storedMatrixTransformations1.copy();
 				storedMatrixTransformations2.add(displayPart.storedMatrixTransformations);
-				storedMatrixTransformations2.add(graphicsHolder -> graphicsHolder.translate(displayXPadding / 16, displayYPadding / 16, -displayDepthOffset));
+				storedMatrixTransformations2.add(graphicsHolder -> graphicsHolder.translate(displayXPadding / 16, displayYPadding / 16, -SMALL_OFFSET));
 				final double width = (displayPart.width - displayXPadding * 2) / 16F;
 				final double height = (displayPart.height - displayYPadding * 2) / 16F;
 
@@ -523,14 +502,13 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 				}
 
 				scrollingTexts.get(scrollingDisplayIndexTracker[0]).changeImage(text.isEmpty() ? null : DynamicTextureCache.instance.getPixelatedText(text, ARGB_BLACK | displayColorInt, Integer.MAX_VALUE, displayCjkSizeRatio, height < 0.1));
-				logScheduledDisplay(queuedRenderLayer.toString(), priority, displayDepthOffset);
-				scrollingTexts.get(scrollingDisplayIndexTracker[0]).scrollText(storedMatrixTransformations2, priority, queuedRenderLayer);
+				scrollingTexts.get(scrollingDisplayIndexTracker[0]).scrollText(storedMatrixTransformations2);
 				scrollingDisplayIndexTracker[0]++;
 			}));
 		});
 	}
 
-	private void renderDisplay(StoredMatrixTransformations storedMatrixTransformations, VehicleExtension vehicle, boolean priority) {
+	private void renderDisplay(StoredMatrixTransformations storedMatrixTransformations, VehicleExtension vehicle) {
 		final String[] textSplit = formatText(vehicle).split("\\|");
 		final boolean[] isCjk = new boolean[textSplit.length];
 		final double[] textHeightScale = new double[textSplit.length];
@@ -541,120 +519,43 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 			tempTotalHeight += textHeightScale[i];
 		}
 		final double rawTextHeight = tempTotalHeight;
-		final double displayDepthOffset = getDisplayDepthOffset(priority);
-		final QueuedRenderLayer queuedRenderLayer = getDisplayRenderLayer(priority);
-		logScheduledDisplay(queuedRenderLayer.toString(), priority, displayDepthOffset);
 
-		MainRenderer.scheduleRender(priority, queuedRenderLayer, (graphicsHolder, offset) -> {
+		MainRenderer.scheduleRender(QueuedRenderLayer.TEXT, (graphicsHolder, offset) -> {
 			storedMatrixTransformations.transform(graphicsHolder, offset);
-			applyDisplayDepthState(priority);
-			try {
-				displayPartDetailsList.forEach(displayPartDetails -> {
-					graphicsHolder.push();
-					graphicsHolder.translate(displayPartDetails.x, displayPartDetails.y, displayPartDetails.z);
-					graphicsHolder.rotateYDegrees(displayPartDetails.flipped ? 180 : 0);
 
-					displayPartDetails.modelDisplayParts.forEach(displayParts -> displayParts.forEach(displayPart -> {
-						displayPart.storedMatrixTransformations.transform(graphicsHolder, Vector3d.getZeroMapped());
-						final double totalTextHeight = Math.min(displayPart.height - displayYPadding * 2, displayMaxLineHeight <= 0 ? Double.MAX_VALUE : displayMaxLineHeight * rawTextHeight) / 16;
-						final double textScale = totalTextHeight / rawTextHeight / (TEXT_HEIGHT + LINE_PADDING);
-						graphicsHolder.translate(displayXPadding / 16, displayYPadding / 16 + Math.max(0, getVerticalAlignment().getOffset(0, (float) (totalTextHeight - (displayPart.height - displayYPadding * 2) / 16))), -displayDepthOffset);
+			displayPartDetailsList.forEach(displayPartDetails -> {
+				graphicsHolder.push();
+				graphicsHolder.translate(displayPartDetails.x, displayPartDetails.y, displayPartDetails.z);
+				graphicsHolder.rotateYDegrees(displayPartDetails.flipped ? 180 : 0);
 
-						for (int i = 0; i < textSplit.length; i++) {
-							final double availableTextWidth = (displayPart.width - displayXPadding * 2) / 16;
-							final double newTextScale = textHeightScale[i] * textScale;
-							final MutableText mutableText = IDrawing.withMTRFont(TextHelper.literal(textSplit[i]));
-							final double textWidth = GraphicsHolder.getTextWidth(mutableText) * newTextScale;
-							final HorizontalAlignment horizontalAlignment = getHorizontalAlignment(isCjk[i]);
-							graphicsHolder.push();
-							graphicsHolder.translate(Math.max(0, horizontalAlignment.getOffset(0, (float) (textWidth - availableTextWidth))), 0, 0);
-							graphicsHolder.scale((float) (Math.min(1, availableTextWidth / textWidth) * newTextScale), (float) newTextScale, 1);
-							graphicsHolder.drawText(mutableText, 0, 0, isCjk[i] ? displayColorCjkInt : displayColorInt, false, GraphicsHolder.getDefaultLight());
-							graphicsHolder.pop();
-							graphicsHolder.translate(0, newTextScale * (TEXT_HEIGHT + LINE_PADDING), 0);
-						}
+				displayPartDetails.modelDisplayParts.forEach(displayParts -> displayParts.forEach(displayPart -> {
+					displayPart.storedMatrixTransformations.transform(graphicsHolder, Vector3d.getZeroMapped());
+					final double totalTextHeight = Math.min(displayPart.height - displayYPadding * 2, displayMaxLineHeight <= 0 ? Double.MAX_VALUE : displayMaxLineHeight * rawTextHeight) / 16;
+					final double textScale = totalTextHeight / rawTextHeight / (TEXT_HEIGHT + LINE_PADDING);
+					graphicsHolder.translate(displayXPadding / 16, displayYPadding / 16 + Math.max(0, getVerticalAlignment().getOffset(0, (float) (totalTextHeight - (displayPart.height - displayYPadding * 2) / 16))), -SMALL_OFFSET);
 
+					for (int i = 0; i < textSplit.length; i++) {
+						final double availableTextWidth = (displayPart.width - displayXPadding * 2) / 16;
+						final double newTextScale = textHeightScale[i] * textScale;
+						final MutableText mutableText = IDrawing.withMTRFont(TextHelper.literal(textSplit[i]));
+						final double textWidth = GraphicsHolder.getTextWidth(mutableText) * newTextScale;
+						final HorizontalAlignment horizontalAlignment = getHorizontalAlignment(isCjk[i]);
+						graphicsHolder.push();
+						graphicsHolder.translate(Math.max(0, horizontalAlignment.getOffset(0, (float) (textWidth - availableTextWidth))), 0, 0);
+						graphicsHolder.scale((float) (Math.min(1, availableTextWidth / textWidth) * newTextScale), (float) newTextScale, 1);
+						graphicsHolder.drawText(mutableText, 0, 0, isCjk[i] ? displayColorCjkInt : displayColorInt, false, GraphicsHolder.getDefaultLight());
 						graphicsHolder.pop();
-					}));
+						graphicsHolder.translate(0, newTextScale * (TEXT_HEIGHT + LINE_PADDING), 0);
+					}
 
 					graphicsHolder.pop();
-				});
-			} finally {
-				restoreDisplayDepthState(priority);
+				}));
+
 				graphicsHolder.pop();
-			}
+			});
+
+			graphicsHolder.pop();
 		});
-	}
-
-	private double getDisplayDepthOffset(boolean renderDisplaysAfterOptimized) {
-		return renderDisplaysAfterOptimized ? SMALL_OFFSET * DEBUG_DISPLAY_DEPTH_MULTIPLIER : SMALL_OFFSET;
-	}
-
-	private QueuedRenderLayer getDisplayRenderLayer(boolean renderDisplaysAfterOptimized) {
-		return renderDisplaysAfterOptimized ? QueuedRenderLayer.TEXT_SEE_THROUGH : QueuedRenderLayer.TEXT;
-	}
-
-	private void applyDisplayDepthState(boolean renderDisplaysAfterOptimized) {
-		if (renderDisplaysAfterOptimized) {
-			RenderSystem.depthMask(false);
-			RenderSystem.disableDepthTest();
-		}
-	}
-
-	public boolean isDisplayPart() {
-		return type == PartType.DISPLAY;
-	}
-
-	public boolean isDoorPart() {
-		return isDoor();
-	}
-
-	public ObjectArrayList<String> getDebugNames() {
-		return new ObjectArrayList<>(names);
-	}
-
-	public String getDebugType() {
-		return type.toString();
-	}
-
-	public String getDebugRenderStage() {
-		return renderStage.toString();
-	}
-
-	public String getDebugCondition() {
-		return condition.toString();
-	}
-
-	private void restoreDisplayDepthState(boolean renderDisplaysAfterOptimized) {
-		if (renderDisplaysAfterOptimized) {
-			RenderSystem.enableDepthTest();
-			RenderSystem.depthMask(true);
-		}
-	}
-
-	private void logDisplayDebug(String action, boolean renderDisplaysAfterOptimized) {
-		if (!renderDisplaysAfterOptimized) {
-			return;
-		}
-		final String key = action + ":" + getDebugDisplayPartName();
-		if (LOGGED_DISPLAY_DEBUG_KEYS.add(key)) {
-			Init.LOGGER.info("[MTR DISPLAY DEBUG] {} part={}", action, getDebugDisplayPartName());
-		}
-	}
-
-	private void logScheduledDisplay(String layer, boolean priority, double offset) {
-		if (!priority) {
-			return;
-		}
-		final String key = "schedule:" + layer + ":" + getDebugDisplayPartName();
-		if (LOGGED_DISPLAY_DEBUG_KEYS.add(key)) {
-			Init.LOGGER.info("[MTR DISPLAY DEBUG] scheduled {} priority={} part={}", layer, priority, getDebugDisplayPartName());
-			Init.LOGGER.info("[MTR DISPLAY DEBUG] TEXT render after optimized=true depthTest=see-through-layer depthWrite=see-through-layer offset={}", offset);
-		}
-	}
-
-	private String getDebugDisplayPartName() {
-		return names.isEmpty() ? "<unnamed>" : String.join("|", names);
 	}
 
 	private void addCube(Identifier texture, ObjectArrayList<ModelPartExtension> modelParts, Object2ObjectOpenHashMap<PartCondition, Object2ObjectOpenHashMap<RenderStage, OptimizedModelWrapper.MaterialGroupWrapper>> materialGroupsForPartConditionAndRenderStage, double x, double y, double z, boolean flipped) {
@@ -676,220 +577,6 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 			newObjModels.add(objModel);
 			return newObjModels;
 		}, Object2ObjectOpenHashMap::new));
-	}
-
-	@Nullable
-	private ModelDisplayPart createSafeObjDisplayPart(String name, OptimizedModel.ObjModel objModel) {
-		final ObjectArrayList<DisplayPlaneCandidate> candidates = new ObjectArrayList<>();
-		final java.util.List<?> rawMeshes = getObjModelRawMeshes(objModel);
-
-		if (rawMeshes != null) {
-			rawMeshes.forEach(rawMesh -> {
-				final DisplayPlaneCandidate candidate = createDisplayPlaneCandidateFromRawMesh(name, rawMesh);
-				if (candidate != null) {
-					candidates.add(candidate);
-				}
-			});
-		}
-
-		if (candidates.isEmpty()) {
-			final DisplayPlaneCandidate wholeModelCandidate = createDisplayPlaneCandidateFromBounds(
-					name,
-					-objModel.getMinX(), -objModel.getMinY(), -objModel.getMinZ(),
-					-objModel.getMaxX(), -objModel.getMaxY(), -objModel.getMaxZ(),
-					"obj-model-bounds"
-			);
-
-			if (wholeModelCandidate != null) {
-				candidates.add(wholeModelCandidate);
-			}
-		}
-
-		if (candidates.isEmpty()) {
-			return null;
-		}
-
-		candidates.sort((candidate1, candidate2) -> Double.compare(candidate2.area, candidate1.area));
-		final DisplayPlaneCandidate candidate = candidates.get(0);
-
-		final ModelDisplayPart modelDisplayPart = new ModelDisplayPart();
-
-        // ObjModel usa coordenadas ya escaladas al mundo/modelo.
-		// ModelDisplayPart.width/height, en cambio, se interpretan como unidades /16 durante el render.
-		modelDisplayPart.width = Math.max(1, (int) Math.round(candidate.width * 16));
-		modelDisplayPart.height = Math.max(1, (int) Math.round(candidate.height * 16));
-
-		modelDisplayPart.storedMatrixTransformations.add(graphicsHolder -> {
-			// El centro del ObjModel ya está en coordenadas de modelo; no dividir entre 16 aquí.
-			graphicsHolder.translate(candidate.centerX, candidate.centerY, candidate.centerZ);
-
-			switch (candidate.normalAxis) {
-				case "X":
-					graphicsHolder.rotateYDegrees(90);
-					break;
-				case "Z":
-				default:
-					break;
-			}
-
-			// Tras escalar width/height a /16, el tamaño real en render será candidate.width/candidate.height.
-			graphicsHolder.translate(-candidate.width / 2, -candidate.height / 2, 0);
-		});
-
-		logObjDisplayCandidate(name, candidate.width, candidate.height, candidate.thickness, candidate.normalAxis, true, "accepted " + candidate.source);
-		return modelDisplayPart;
-	}
-
-	@Nullable
-	private DisplayPlaneCandidate createDisplayPlaneCandidateFromRawMesh(String name, Object rawMesh) {
-		try {
-			final java.util.List<?> vertices = (java.util.List<?>) rawMesh.getClass().getField("vertices").get(rawMesh);
-			if (vertices == null || vertices.isEmpty()) {
-				return null;
-			}
-
-			double minX = Double.MAX_VALUE;
-			double minY = Double.MAX_VALUE;
-			double minZ = Double.MAX_VALUE;
-			double maxX = -Double.MAX_VALUE;
-			double maxY = -Double.MAX_VALUE;
-			double maxZ = -Double.MAX_VALUE;
-
-			for (final Object vertex : vertices) {
-				final Object position = vertex.getClass().getField("position").get(vertex);
-				final double x = -((Number) position.getClass().getMethod("getX").invoke(position)).doubleValue();
-				final double y = -((Number) position.getClass().getMethod("getY").invoke(position)).doubleValue();
-				final double z = -((Number) position.getClass().getMethod("getZ").invoke(position)).doubleValue();
-
-				minX = Math.min(minX, x);
-				minY = Math.min(minY, y);
-				minZ = Math.min(minZ, z);
-				maxX = Math.max(maxX, x);
-				maxY = Math.max(maxY, y);
-				maxZ = Math.max(maxZ, z);
-			}
-
-			return createDisplayPlaneCandidateFromBounds(name, minX, minY, minZ, maxX, maxY, maxZ, "raw-mesh");
-		} catch (Exception ignored) {
-			return null;
-		}
-	}
-
-	@Nullable
-	private DisplayPlaneCandidate createDisplayPlaneCandidateFromBounds(String name, double rawMinX, double rawMinY, double rawMinZ, double rawMaxX, double rawMaxY, double rawMaxZ, String source) {
-		final double minX = Math.min(rawMinX, rawMaxX);
-		final double minY = Math.min(rawMinY, rawMaxY);
-		final double minZ = Math.min(rawMinZ, rawMaxZ);
-		final double maxX = Math.max(rawMinX, rawMaxX);
-		final double maxY = Math.max(rawMinY, rawMaxY);
-		final double maxZ = Math.max(rawMinZ, rawMaxZ);
-
-		final double sizeX = maxX - minX;
-		final double sizeY = maxY - minY;
-		final double sizeZ = maxZ - minZ;
-
-		final String normalAxis;
-		final double width;
-		final double height;
-		final double thickness;
-
-		if (sizeZ <= sizeX && sizeZ <= sizeY) {
-			normalAxis = "Z";
-			width = sizeX;
-			height = sizeY;
-			thickness = sizeZ;
-		} else if (sizeX <= sizeY && sizeX <= sizeZ) {
-			normalAxis = "X";
-			width = sizeZ;
-			height = sizeY;
-			thickness = sizeX;
-		} else {
-			normalAxis = "Y";
-			width = sizeX;
-			height = sizeZ;
-			thickness = sizeY;
-		}
-
-		if (width <= 0 || height <= 0) {
-			logObjDisplayCandidate(name, width, height, thickness, normalAxis, false, "zero dimensions " + source);
-			return null;
-		}
-
-		// Estos valores están en coordenadas de modelo/bloques, no en píxeles.
-		if (width > 8 || height > 3) {
-			logObjDisplayCandidate(name, width, height, thickness, normalAxis, false, "too large " + source);
-			return null;
-		}
-
-		if (thickness > 0.5) {
-			logObjDisplayCandidate(name, width, height, thickness, normalAxis, false, "too thick " + source);
-			return null;
-		}
-
-		if (normalAxis.equals("Y")) {
-			logObjDisplayCandidate(name, width, height, thickness, normalAxis, false, "horizontal display plane rejected " + source);
-			return null;
-		}
-
-		final double area = width * height;
-		if (area <= 0) {
-			logObjDisplayCandidate(name, width, height, thickness, normalAxis, false, "zero area " + source);
-			return null;
-		}
-
-		return new DisplayPlaneCandidate(
-				(minX + maxX) / 2,
-				(minY + maxY) / 2,
-				(minZ + maxZ) / 2,
-				width,
-				height,
-				thickness,
-				area,
-				normalAxis,
-				source
-		);
-	}
-
-	@Nullable
-	private java.util.List<?> getObjModelRawMeshes(OptimizedModel.ObjModel objModel) {
-		try {
-			final java.lang.reflect.Field rawMeshesField = OptimizedModel.ObjModel.class.getDeclaredField("rawMeshes");
-			rawMeshesField.setAccessible(true);
-			return (java.util.List<?>) rawMeshesField.get(objModel);
-		} catch (Exception ignored) {
-			return null;
-		}
-	}
-
-	private void logObjDisplayCandidate(String name, double width, double height, double thickness, String normalAxis, boolean accepted, String reason) {
-		final String key = "obj-display-candidate:" + name + ":" + accepted + ":" + reason;
-		if (LOGGED_DISPLAY_DEBUG_KEYS.add(key)) {
-			Init.LOGGER.info("[MTR DISPLAY DEBUG] obj display candidate part={} width={} height={} thickness={} normalAxis={} accepted={} reason={}", name, width, height, thickness, normalAxis, accepted, reason);
-		}
-	}
-
-	private void logObjDisplayAdded(String positionDefinitionName, double x, double y, double z, boolean flipped) {
-		final String key = "obj-display-added:" + getDebugDisplayPartName() + ":" + positionDefinitionName + ":" + flipped;
-		if (LOGGED_DISPLAY_DEBUG_KEYS.add(key)) {
-			Init.LOGGER.info("[MTR DISPLAY DEBUG] displayPartDetails added part={} positionDefinition={} x={} y={} z={} flipped={}", getDebugDisplayPartName(), positionDefinitionName, x, y, z, flipped);
-		}
-	}
-
-
-	private void logRejectedObjDisplay(String name, OptimizedModel.ObjModel objModel, String reason) {
-		if (!(StringUtils.containsIgnoreCase(name, "display") || StringUtils.containsIgnoreCase(name, "matrix") || StringUtils.containsIgnoreCase(name, "lcd") || StringUtils.containsIgnoreCase(name, "ziel") || StringUtils.containsIgnoreCase(name, "destination"))) {
-			return;
-		}
-		final String key = "obj-display-reject:" + name;
-		if (!LOGGED_DISPLAY_DEBUG_KEYS.add(key)) {
-			return;
-		}
-		final double width = Math.abs(objModel.getMaxX() - objModel.getMinX());
-		final double height = Math.abs(objModel.getMaxY() - objModel.getMinY());
-		final double depth = Math.abs(objModel.getMaxZ() - objModel.getMinZ());
-		Init.LOGGER.info("[MTR DISPLAY DEBUG] display part={} width={} height={} depth={} source=obj-bbox", name, width, height, depth);
-		Init.LOGGER.info("[MTR DISPLAY DEBUG] display transform=<rejected>");
-		Init.LOGGER.info("[MTR DISPLAY DEBUG] display rejected reason={}", reason);
 	}
 
 	private String formatText(Vehicle vehicle) {
@@ -1050,32 +737,6 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 			return defaultValue;
 		}
 	}
-
-	private static final class DisplayPlaneCandidate {
-
-		private final double centerX;
-		private final double centerY;
-		private final double centerZ;
-		private final double width;
-		private final double height;
-		private final double thickness;
-		private final double area;
-		private final String normalAxis;
-		private final String source;
-
-		private DisplayPlaneCandidate(double centerX, double centerY, double centerZ, double width, double height, double thickness, double area, String normalAxis, String source) {
-			this.centerX = centerX;
-			this.centerY = centerY;
-			this.centerZ = centerZ;
-			this.width = width;
-			this.height = height;
-			this.thickness = thickness;
-			this.area = area;
-			this.normalAxis = normalAxis;
-			this.source = source;
-		}
-	}
-
 
 	private static class PartDetails {
 

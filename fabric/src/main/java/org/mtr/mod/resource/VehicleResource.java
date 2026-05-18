@@ -29,10 +29,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public final class VehicleResource extends VehicleResourceSchema {
-
-	private static final ObjectOpenHashSet<String> LOGGED_DEBUG_KEYS = new ObjectOpenHashSet<>();
-
-	public final Supplier<VehicleSoundBase> createVehicleSoundBase;
+public final Supplier<VehicleSoundBase> createVehicleSoundBase;
 	public final boolean shouldPreload;
 	@Nullable
 	private final LegacyVehicleSupplier<ObjectArrayList<VehicleModel>> extraModelsSupplier;
@@ -439,9 +436,6 @@ public final class VehicleResource extends VehicleResourceSchema {
 				final Object2ObjectOpenHashMap<PartCondition, ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper>> objModelsBogie2Model = new Object2ObjectOpenHashMap<>();
 
 				forEachNonNull(allModelsList, dynamicVehicleModel -> dynamicVehicleModel.writeFloorsAndDoorways(floors, doorways, seats, materialGroupsModel, materialGroupsModelDoorsClosed, objModelsModel, objModelsModelDoorsClosed), force);
-				if (shouldDebugModels(allModelsList) && LOGGED_DEBUG_KEYS.add("combined_wrappers")) {
-					Init.LOGGER.info("[MTR OBJ DEBUG] vehicle n4420 combined wrappers={}", countMaterialWrappers(materialGroupsModel) + countMaterialWrappers(materialGroupsModelDoorsClosed) + countObjWrappers(objModelsModel) + countObjWrappers(objModelsModelDoorsClosed));
-				}
 
 				if (floors.isEmpty() && doorways.isEmpty()) {
 					Init.LOGGER.info("[{}] No floors or doorways found in vehicle models", id);

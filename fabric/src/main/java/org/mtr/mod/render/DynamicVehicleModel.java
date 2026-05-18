@@ -29,8 +29,7 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 
 	private static final String DEFAULT_OBJ_GROUP = "default";
 	private static final double FALLBACK_DEFAULT_OBJ_SCALE = 0.999;
-	private static final ObjectOpenHashSet<String> LOGGED_DEBUG_KEYS = new ObjectOpenHashSet<>();
-	private static final String[] GLASS_TEXTURE_HINTS = {"fenster", "window", "glass", "tint", "reflexion", "reflex", "alpha", "opacity"};
+private static final String[] GLASS_TEXTURE_HINTS = {"fenster", "window", "glass", "tint", "reflexion", "reflex", "alpha", "opacity"};
 	private static final String[] DISPLAY_TEXTURE_HINTS = {"matrix", "display", "lcd", "led", "route", "ziel"};
 	private static final String[] INTERIOR_TEXTURE_HINTS = {"interior", "lights_interior", "cockpit", "driver", "seat", "seats"};
 	private static final String[] DOOR_TEXTURE_HINTS = {"tuer", "door", "fafhrertuer"};
@@ -92,7 +91,6 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 		this.texture = texture;
 		this.modelProperties = modelProperties;
 		modelProperties.iterateParts(modelPropertiesPart -> modelPropertiesPart.writeCache(texture, nameToPart, nameToDisplayParts, positionDefinitions, floors, doorways, seats, materialGroupsForPartConditionAndRenderStage, materialGroupsForPartConditionAndRenderStageDoorsClosed));
-		logBbModelDebug(nameToPart.keySet(), nameToDisplayParts.keySet());
 		testDoors(id);
 	}
 
@@ -108,8 +106,23 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 		this.modelProperties = modelProperties;
 		this.debugObjResource = debugObjResource;
 		debugBbModel = false;
+
 		final int[] matchedGroups = {0};
-		modelProperties.iterateParts(modelPropertiesPart -> matchedGroups[0] += modelPropertiesPart.writeCache(nameToObjModels, positionDefinitions, floors, doorways, seats, objModelsForPartConditionAndRenderStage, objModelsForPartConditionAndRenderStageDoorsClosed, modelProperties.getModelYOffset()));
+
+		modelProperties.iterateParts(modelPropertiesPart -> {
+			modelPropertiesPart.writeCache(
+					nameToObjModels,
+					positionDefinitions,
+					floors,
+					doorways,
+					seats,
+					objModelsForPartConditionAndRenderStage,
+					objModelsForPartConditionAndRenderStageDoorsClosed,
+					modelProperties.getModelYOffset()
+			);
+			matchedGroups[0]++;
+		});
+
 		applyLegacyDefaultObjFallback(nameToObjModels, modelProperties, matchedGroups[0], debugObjResource);
 		testDoors(id);
 	}
@@ -123,12 +136,17 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 	}
 
 	public void render(StoredMatrixTransformations storedMatrixTransformations, @Nullable VehicleExtension vehicle, int carNumber, int[] scrollingDisplayIndexTracker, int light, ObjectArrayList<ObjectDoubleImmutablePair<Box>> openDoorways, boolean fromResourcePackCreator) {
-		if (debugBbModel && LOGGED_DEBUG_KEYS.add("render_bbmodel")) {
-			Init.LOGGER.info("[MTR OBJ DEBUG] rendering bbmodel=true");
-		}
 
-		final boolean renderDisplaysAfterOptimized = debugBbModel || debugObjResource != null;
-		modelProperties.iterateParts(modelPropertiesPart -> modelPropertiesPart.render(texture, storedMatrixTransformations, vehicle, carNumber, scrollingDisplayIndexTracker, light, openDoorways, fromResourcePackCreator, renderDisplaysAfterOptimized));
+		modelProperties.iterateParts(modelPropertiesPart -> modelPropertiesPart.render(
+				texture,
+				storedMatrixTransformations,
+				vehicle,
+				carNumber,
+				scrollingDisplayIndexTracker,
+				light,
+				openDoorways,
+				fromResourcePackCreator
+		));
 	}
 
 	public void writeFloorsAndDoorways(
@@ -148,12 +166,6 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 		materialGroupsForPartConditionAndRenderStageDoorsClosed.forEach((partCondition, materialGroupsForRenderStage) -> Data.put(materialGroupsForPartConditionDoorsClosed, partCondition, materialGroupsForRenderStage.values(), ObjectArrayList::new));
 		objModelsForPartConditionAndRenderStage.forEach((partCondition, objModelsForRenderStage) -> Data.put(objModelsForPartCondition, partCondition, flattenCollection(objModelsForRenderStage.values()), ObjectArrayList::new));
 		objModelsForPartConditionAndRenderStageDoorsClosed.forEach((partCondition, objModelsForRenderStage) -> Data.put(objModelsForPartConditionDoorsClosed, partCondition, flattenCollection(objModelsForRenderStage.values()), ObjectArrayList::new));
-		if (debugObjResource != null && LOGGED_DEBUG_KEYS.add("wrappers_obj")) {
-			Init.LOGGER.info("[MTR OBJ DEBUG] vehicle n4420 model entry obj wrappers={}", countObjWrappers(objModelsForPartCondition) + countObjWrappers(objModelsForPartConditionDoorsClosed));
-		}
-		if (debugBbModel && LOGGED_DEBUG_KEYS.add("wrappers_bbmodel")) {
-			Init.LOGGER.info("[MTR OBJ DEBUG] vehicle n4420 model entry bbmodel wrappers={}", countMaterialWrappers(materialGroupsForPartCondition) + countMaterialWrappers(materialGroupsForPartConditionDoorsClosed));
-		}
 
 		materialGroupsForPartConditionAndRenderStage.clear();
 		materialGroupsForPartConditionAndRenderStageDoorsClosed.clear();
@@ -206,26 +218,20 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 
 	private void applyLegacyDefaultObjFallback(Object2ObjectAVLTreeMap<String, OptimizedModel.ObjModel> nameToObjModels, ModelProperties modelProperties, int matchedGroups, @Nullable String debugObjResource) {
 		if (matchedGroups > 0) {
-			if (debugObjResource != null) {
-				Init.LOGGER.info("[MTR OBJ DEBUG] fallback default group not needed; matchedGroups={}", matchedGroups);
-			}
 			return;
 		}
 
 		if (nameToObjModels.size() != 1) {
-			logFallbackSkip(debugObjResource, "obj group count is " + nameToObjModels.size());
 			return;
 		}
 
 		final OptimizedModel.ObjModel defaultObjModel = nameToObjModels.get(DEFAULT_OBJ_GROUP);
 		if (defaultObjModel == null) {
-			logFallbackSkip(debugObjResource, "default group missing");
 			return;
 		}
 
 		final ObjectArrayList<FallbackObjBucket> fallbackObjBuckets = createLegacyFallbackObjBuckets(defaultObjModel, modelProperties, debugObjResource);
 		if (fallbackObjBuckets.isEmpty()) {
-			logFallbackSkip(debugObjResource, "no fallback meshes remain after classification");
 			return;
 		}
 		fallbackObjBuckets.forEach(fallbackObjBucket -> {
@@ -235,25 +241,12 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 			Data.put(objModelsForPartConditionAndRenderStage, PartCondition.NORMAL, fallbackObjBucket.renderStage, oldValue -> addFallbackObjModel(oldValue, defaultObjModelWrapper), Object2ObjectOpenHashMap::new);
 			Data.put(objModelsForPartConditionAndRenderStageDoorsClosed, PartCondition.NORMAL, fallbackObjBucket.renderStage, oldValue -> addFallbackObjModel(oldValue, defaultObjModelWrapper), Object2ObjectOpenHashMap::new);
 		});
-
-		if (debugObjResource != null) {
-			Init.LOGGER.info("[MTR OBJ DEBUG] fallback default group enabled for {}", debugObjResource);
-			Init.LOGGER.info("[MTR OBJ DEBUG] fallback wrapper optimizedModel=true");
-			Init.LOGGER.info("[MTR OBJ DEBUG] fallback render invoked normalPath=true earlyQueue=false");
-			Init.LOGGER.info("[MTR OBJ DEBUG] fallback visible candidate=true");
-		}
 	}
 
 	private static ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper> addFallbackObjModel(@Nullable ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper> oldValue, OptimizedModelWrapper.ObjModelWrapper objModelWrapper) {
 		final ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper> newObjModels = oldValue == null ? new ObjectArrayList<>() : oldValue;
 		newObjModels.add(objModelWrapper);
 		return newObjModels;
-	}
-
-	private static void logFallbackSkip(@Nullable String debugObjResource, String reason) {
-		if (debugObjResource != null) {
-			Init.LOGGER.info("[MTR OBJ DEBUG] fallback default group skipped reason={}", reason);
-		}
 	}
 
 	private static int countObjWrappers(Object2ObjectOpenHashMap<PartCondition, ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper>> objModels) {
@@ -267,7 +260,6 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 	private ObjectArrayList<FallbackObjBucket> createLegacyFallbackObjBuckets(OptimizedModel.ObjModel defaultObjModel, ModelProperties modelProperties, @Nullable String debugObjResource) {
 		final List<?> rawMeshes = getRawMeshes(defaultObjModel);
 		if (rawMeshes == null || rawMeshes.isEmpty()) {
-			logFallbackSkip(debugObjResource, "raw mesh list unavailable");
 			return new ObjectArrayList<>();
 		}
 
@@ -296,22 +288,6 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 			}
 		});
 
-		if (debugObjResource != null && LOGGED_DEBUG_KEYS.add("fallback_meshes_" + debugObjResource)) {
-			Init.LOGGER.info("[MTR OBJ DEBUG] fallback raw meshes total={} selected={}", rawMeshes.size(), meshesByCategory.values().stream().mapToInt(ObjectArrayList::size).sum());
-			textureAssignments.object2ObjectEntrySet().stream()
-					.sorted((entry1, entry2) -> Integer.compare(entry2.getValue().right(), entry1.getValue().right()))
-					.forEach(entry -> Init.LOGGER.info("[MTR OBJ DEBUG] mesh texture={} count={} assignedLayer={} reason={}", entry.getKey(), entry.getValue().right(), entry.getValue().left().layerName, entry.getValue().left().reason));
-			excludedTextureInfo.object2ObjectEntrySet().stream()
-					.sorted((entry1, entry2) -> Integer.compare(entry2.getValue().rightInt(), entry1.getValue().rightInt()))
-					.forEach(entry -> Init.LOGGER.info("[MTR OBJ DEBUG] excluded texture={} reason={} count={}", entry.getKey(), entry.getValue().left(), entry.getValue().rightInt()));
-			Init.LOGGER.info("[MTR OBJ DEBUG] bbmodel display parts={}", hasDisplayParts);
-			Init.LOGGER.info("[MTR OBJ DEBUG] obj display textures={}", objDisplayTextures);
-			Init.LOGGER.info("[MTR OBJ DEBUG] display handling={}", hasDisplayParts ? "excluded_for_bbmodel" : "rendered_as_text");
-			Init.LOGGER.info("[MTR OBJ DEBUG] modelProperties door candidates={}", modelProperties.getDoorPartNames());
-			Init.LOGGER.info("[MTR OBJ DEBUG] obj door textures={}", objDoorTextures);
-			Init.LOGGER.info("[MTR OBJ DEBUG] door handling={}", hasDoorParts ? "excluded_for_dynamic" : "static_fallback");
-		}
-
 		final ObjectArrayList<FallbackObjBucket> fallbackObjBuckets = new ObjectArrayList<>();
 		for (final FallbackCategory fallbackCategory : FallbackCategory.values()) {
 			if (fallbackCategory.excluded) {
@@ -324,53 +300,9 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 			final OptimizedModel.ObjModel filteredObjModel = instantiateFilteredObjModel(categoryMeshes);
 			if (filteredObjModel != null) {
 				fallbackObjBuckets.add(new FallbackObjBucket(filteredObjModel, fallbackCategory.shaderType, fallbackCategory.renderStage));
-			} else {
-				logFallbackSkip(debugObjResource, "failed to instantiate filtered obj model for " + fallbackCategory.layerName);
 			}
-		}
-
-		if (debugObjResource != null) {
-			final Object2IntOpenHashMap<FallbackCategory> categoryCounts = new Object2IntOpenHashMap<>();
-			meshesByCategory.forEach((category, meshes) -> categoryCounts.put(category, meshes.size()));
-			Init.LOGGER.info("[MTR OBJ DEBUG] legacy fallback category exterior_body={}", categoryCounts.getInt(FallbackCategory.BODY));
-			Init.LOGGER.info("[MTR OBJ DEBUG] legacy fallback category exterior_detail={}", categoryCounts.getInt(FallbackCategory.DETAILS));
-			Init.LOGGER.info("[MTR OBJ DEBUG] legacy fallback category glass_translucent={}", categoryCounts.getInt(FallbackCategory.GLASS));
-			Init.LOGGER.info("[MTR OBJ DEBUG] legacy fallback category interior={}", categoryCounts.getInt(FallbackCategory.INTERIOR));
-			Init.LOGGER.info("[MTR OBJ DEBUG] legacy fallback category lights={}", categoryCounts.getInt(FallbackCategory.LIGHTS));
-			Init.LOGGER.info("[MTR OBJ DEBUG] legacy fallback category display_excluded={}", excludedTextureInfo.values().stream().filter(pair -> StringUtils.equals(pair.left(), FallbackCategory.EXCLUDED_DISPLAY.reason)).mapToInt(ObjectIntImmutablePair::rightInt).sum());
-			Init.LOGGER.info("[MTR OBJ DEBUG] legacy fallback category door_static={}", categoryCounts.getInt(FallbackCategory.DOOR_STATIC));
-			Init.LOGGER.info("[MTR OBJ DEBUG] legacy fallback category door_excluded={}", excludedTextureInfo.values().stream().filter(pair -> StringUtils.equals(pair.left(), FallbackCategory.EXCLUDED_DOOR.reason)).mapToInt(ObjectIntImmutablePair::rightInt).sum());
-			Init.LOGGER.info("[MTR OBJ DEBUG] fallback using classified meshes for {}", debugObjResource);
 		}
 		return fallbackObjBuckets;
-	}
-
-	private void logBbModelDebug(Collection<String> partNames, Collection<String> displayPartNames) {
-		if (!debugBbModel || !LOGGED_DEBUG_KEYS.add("bbmodel_parts")) {
-			return;
-		}
-		final ObjectLinkedOpenHashSet<String> candidateNames = new ObjectLinkedOpenHashSet<>();
-		partNames.forEach(name -> {
-			if (containsDebugCandidate(name)) {
-				candidateNames.add(name);
-			}
-		});
-		displayPartNames.forEach(name -> {
-			if (containsDebugCandidate(name)) {
-				candidateNames.add(name);
-			}
-		});
-		final ObjectLinkedOpenHashSet<String> doorCandidateNames = new ObjectLinkedOpenHashSet<>();
-		partNames.forEach(name -> {
-			final String lowercaseName = name.toLowerCase(Locale.ROOT);
-			if (lowercaseName.contains("door") || lowercaseName.contains("tuer")) {
-				doorCandidateNames.add(name);
-			}
-		});
-		Init.LOGGER.info("[MTR OBJ DEBUG] bbmodel parts={}", partNames.size());
-		Init.LOGGER.info("[MTR OBJ DEBUG] bbmodel has display parts={}", !displayPartNames.isEmpty());
-		Init.LOGGER.info("[MTR OBJ DEBUG] bbmodel has door/window/interior candidates={}", candidateNames);
-		Init.LOGGER.info("[MTR OBJ DEBUG] bbmodel door candidates={}", doorCandidateNames);
 	}
 
 	private static boolean containsDebugCandidate(String name) {
